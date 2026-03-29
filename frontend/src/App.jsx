@@ -1953,15 +1953,11 @@ function AdminProductsPage() {
 
 // ─── ADMIN: PRODUCT FORM ──────────────────────────────────────────────────────
 
-// Thay thế hàm AdminProductFormPage trong App.jsx
-// Thêm tính năng upload ảnh lên Cloudinary thay vì nhập URL thủ công
-
 function AdminProductFormPage() {
   const isEdit = window.location.pathname.includes('/edit/');
   const id = isEdit ? window.location.pathname.split('/').pop() : null;
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [specsRaw, setSpecsRaw] = useState('');
   const [upsellRaw, setUpsellRaw] = useState('');
   const [form, setForm] = useState({
@@ -1970,22 +1966,15 @@ function AdminProductFormPage() {
   });
   const toast = useToast();
   const navigate = useNavigate();
-  const fileRef = React.useRef();
 
   useEffect(() => {
     api.get('/categories').then(setCategories);
     if (isEdit) {
       api.get(`/admin/products/${id}`).then(p => {
-        setForm({
-          name: p.name, slug: p.slug, brand: p.brand || '',
-          price: p.price, stock: p.stock, min_stock: p.min_stock || 5,
-          weight_kg: p.weight_kg || 1, description: p.description || '',
-          image_url: p.image_url || '', category_id: p.category_id || p.category || '',
-          is_active: p.is_active ? 1 : 0
-        });
-        const specs = p.specs instanceof Object && !Array.isArray(p.specs) ? p.specs : {};
-        setSpecsRaw(JSON.stringify(specs, null, 2));
-        setUpsellRaw((p.upsell_ids || []).join(', '));
+        setForm({ name:p.name, slug:p.slug, brand:p.brand||'', price:p.price, stock:p.stock, min_stock:p.min_stock||5,
+          weight_kg:p.weight_kg||1, description:p.description||'', image_url:p.image_url||'', category_id:p.category_id, is_active:p.is_active });
+        setSpecsRaw(JSON.stringify(JSON.parse(p.specs||'{}'), null, 2));
+        setUpsellRaw((JSON.parse(p.upsell_ids||'[]')).join(', '));
       }).catch(() => navigate('/admin/products'));
     }
   }, [id]);
@@ -1998,202 +1987,105 @@ function AdminProductFormPage() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Upload ảnh lên Cloudinary qua backend
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast('Ảnh không được quá 5MB', 'error');
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('image', file);
-      const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/upload`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: formData
-      });
-      const data = await res.json();
-      if (data.url) {
-        set('image_url', data.url);
-        toast('Tải ảnh lên thành công!', 'success');
-      } else {
-        throw new Error(data.error || 'Upload thất bại');
-      }
-    } catch (err) {
-      toast(err.message || 'Lỗi tải ảnh', 'error');
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.price || !form.category_id) return toast('Thiếu thông tin bắt buộc!', 'error');
-
-    let specs = {};
+    let specs = {}, upsell_ids = [];
     try { specs = specsRaw.trim() ? JSON.parse(specsRaw) : {}; }
     catch { return toast('Thông số kỹ thuật không đúng định dạng JSON', 'error'); }
-
-    const upsell_ids = upsellRaw.split(',').map(s => s.trim()).filter(Boolean);
+    upsell_ids = upsellRaw.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
 
     setLoading(true);
     try {
-      const payload = {
-        ...form,
-        price: parseFloat(form.price),
-        stock: parseInt(form.stock) || 0,
-        min_stock: parseInt(form.min_stock) || 5,
-        weight_kg: parseFloat(form.weight_kg) || 1,
-        is_active: form.is_active === 1 || form.is_active === true,
-        specs,
-        upsell_ids,
-        category_id: form.category_id
-      };
-
+      const payload = { ...form, price: parseFloat(form.price), stock: parseInt(form.stock)||0,
+        min_stock: parseInt(form.min_stock)||5, weight_kg: parseFloat(form.weight_kg)||1,
+        specs: JSON.stringify(specs), upsell_ids: JSON.stringify(upsell_ids) };
       if (isEdit) await api.patch(`/admin/products/${id}`, payload);
       else await api.post('/admin/products', payload);
-
       toast(isEdit ? 'Cập nhật thành công!' : 'Thêm sản phẩm thành công!', 'success');
       navigate('/admin/products');
-    } catch (err) {
-      toast(err.error || 'Lỗi khi lưu', 'error');
-    } finally {
-      setLoading(false);
-    }
+    } catch (err) { toast(err.error || 'Lỗi khi lưu', 'error'); }
+    finally { setLoading(false); }
   };
 
   return (
     <div className="container" style={{ padding: '24px 16px 48px', maxWidth: 720 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => navigate('/admin/products')}
-          style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-muted)', cursor: 'pointer' }}>←</button>
+        <button onClick={() => navigate('/admin/products')} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-muted)', cursor: 'pointer' }}>←</button>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>{isEdit ? '✏️ Sửa sản phẩm' : '➕ Thêm sản phẩm mới'}</h1>
       </div>
 
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: 'var(--shadow)' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-
-            {/* Tên */}
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
               <label style={styles.label}>Tên sản phẩm *</label>
               <input value={form.name} onChange={e => { set('name', e.target.value); if (!isEdit) set('slug', autoSlug(e.target.value)); }}
                 placeholder="Ấm đun siêu tốc Philips 1.7L" style={styles.input} />
             </div>
-
-            {/* Slug */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Slug (URL) *</label>
               <input value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="am-dun-sieu-toc-philips" style={styles.input} />
             </div>
-
-            {/* Thương hiệu */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Thương hiệu</label>
               <input value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="Philips, Sunhouse..." style={styles.input} />
             </div>
-
-            {/* Danh mục */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Danh mục *</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)} style={styles.input}>
                 <option value="">-- Chọn danh mục --</option>
-                {categories.map(c => <option key={c._id || c.id} value={c._id || c.id}>{c.icon} {c.name}</option>)}
+                {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
               </select>
             </div>
-
-            {/* Giá */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Giá bán (₫) *</label>
               <input value={form.price} onChange={e => set('price', e.target.value)} type="number" min="0" placeholder="250000" style={styles.input} />
             </div>
-
-            {/* Tồn kho */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Tồn kho</label>
               <input value={form.stock} onChange={e => set('stock', e.target.value)} type="number" min="0" placeholder="100" style={styles.input} />
             </div>
-
-            {/* Cảnh báo kho */}
             <div style={styles.formGroup}>
-              <label style={styles.label}>Cảnh báo khi còn dưới</label>
+              <label style={styles.label}>Cảnh báo khi tồn kho dưới</label>
               <input value={form.min_stock} onChange={e => set('min_stock', e.target.value)} type="number" min="0" placeholder="5" style={styles.input} />
             </div>
-
-            {/* Khối lượng */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Khối lượng (kg)</label>
               <input value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} type="number" min="0" step="0.1" placeholder="1.5" style={styles.input} />
             </div>
-
-            {/* Upload ảnh */}
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Ảnh sản phẩm</label>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <input value={form.image_url} onChange={e => set('image_url', e.target.value)}
-                    placeholder="Nhập URL hoặc upload ảnh bên dưới..." style={styles.input} />
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input ref={fileRef} type="file" accept="image/*" onChange={handleFileUpload}
-                      style={{ display: 'none' }} />
-                    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-                      style={{ ...styles.btn2, fontSize: 13, padding: '7px 14px' }}>
-                      {uploading ? '⏳ Đang tải...' : '📸 Chọn ảnh từ máy'}
-                    </button>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tối đa 5MB, định dạng JPG/PNG/WebP</span>
-                  </div>
-                </div>
-                {form.image_url && (
-                  <img src={form.image_url} alt="preview"
-                    style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', flexShrink: 0 }} />
-                )}
-              </div>
+              <label style={styles.label}>URL ảnh sản phẩm</label>
+              <input value={form.image_url} onChange={e => set('image_url', e.target.value)} placeholder="https://..." style={styles.input} />
+              {form.image_url && <img src={form.image_url} alt="preview" style={{ width: 100, height: 80, objectFit: 'cover', borderRadius: 8, marginTop: 6 }} />}
             </div>
-
-            {/* Mô tả */}
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
               <label style={styles.label}>Mô tả sản phẩm</label>
               <textarea value={form.description} onChange={e => set('description', e.target.value)}
-                placeholder="Mô tả chi tiết về sản phẩm..."
-                style={{ ...styles.input, height: 90, resize: 'vertical' }} />
+                placeholder="Mô tả chi tiết..." style={{ ...styles.input, height: 90, resize: 'vertical' }} />
             </div>
-
-            {/* Thông số kỹ thuật JSON */}
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
               <label style={styles.label}>Thông số kỹ thuật (JSON)</label>
               <textarea value={specsRaw} onChange={e => setSpecsRaw(e.target.value)}
                 placeholder={'{\n  "Công suất": "1200W",\n  "Dung tích": "1.7L",\n  "Chất liệu": "Inox 304"\n}'}
-                style={{ ...styles.input, height: 110, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
-              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Nhập theo dạng JSON. Ví dụ: {`{"Công suất": "2200W", "Dung tích": "1.7L"}`}
-              </p>
+                style={{ ...styles.input, height: 100, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>Định dạng JSON: key là tên thông số, value là giá trị</p>
             </div>
-
-            {/* Upsell IDs */}
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Gợi ý mua kèm — ID sản phẩm (cách nhau dấu phẩy)</label>
-              <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)}
-                placeholder="id1, id2, id3" style={styles.input} />
+              <label style={styles.label}>Mua kèm giá hời — ID sản phẩm gợi ý (cách nhau bằng dấu phẩy)</label>
+              <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)} placeholder="3, 7, 12" style={styles.input} />
             </div>
-
-            {/* Trạng thái */}
             <div style={styles.formGroup}>
-              <label style={styles.label}>Trạng thái hiển thị</label>
+              <label style={styles.label}>Trạng thái</label>
               <select value={form.is_active} onChange={e => set('is_active', parseInt(e.target.value))} style={styles.input}>
-                <option value={1}>Đang bán (hiển thị)</option>
-                <option value={0}>Ẩn (không hiển thị)</option>
+                <option value={1}>Đang bán</option>
+                <option value={0}>Ẩn</option>
               </select>
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-            <button type="button" onClick={() => navigate('/admin/products')}
-              className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }}>
-              Huỷ
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading || uploading}
-              style={{ flex: 2, justifyContent: 'center', padding: 14 }}>
+            <button type="button" onClick={() => navigate('/admin/products')} className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }}>Huỷ</button>
+            <button type="submit" className="btn btn-primary" disabled={loading} style={{ flex: 2, justifyContent: 'center', padding: 14 }}>
               {loading ? 'Đang lưu...' : isEdit ? '💾 Lưu thay đổi' : '➕ Thêm sản phẩm'}
             </button>
           </div>
@@ -2202,6 +2094,7 @@ function AdminProductFormPage() {
     </div>
   );
 }
+
 // ─── ADMIN: REPORTS ───────────────────────────────────────────────────────────
 
 function AdminReportsPage() {
@@ -2458,34 +2351,59 @@ function AdminCouponsPage() {
 
 function AdminWarrantyFormPage() {
   const orderId = new URLSearchParams(window.location.search).get('order_id') || '';
-  const [form, setForm] = useState({ order_id: orderId, product_id:'', customer_phone:'', serial_number:'', imei:'', purchase_date: new Date().toISOString().slice(0,10), warranty_months:'12', notes:'' });
-  const [products, setProducts] = useState([]);
+  const [form, setForm] = useState({
+    order_id: orderId, product_id: '', customer_phone: '',
+    serial_number: '', imei: '',
+    purchase_date: new Date().toISOString().slice(0, 10),
+    warranty_months: '12', notes: ''
+  });
+  const [orderItems, setOrderItems] = useState([]);
+  const [orderInfo, setOrderInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/admin/products/all').then(setProducts);
-    if (orderId) {
-      api.get(`/orders/${orderId}`).then(d => {
-        setForm(f => ({ ...f, customer_phone: d.order.customer_phone }));
-        if (d.items?.length === 1) setForm(f => ({ ...f, product_id: d.items[0].product_id }));
-        setProducts(d.items?.map(i => ({ id: i.product_id, name: i.name })) || []);
-      }).catch(() => {});
-    }
+    if (!orderId) return;
+    api.get(`/orders/${orderId}`).then(d => {
+      const order = d.order;
+      const items = d.items || [];
+
+      // Tự điền SĐT khách từ đơn hàng
+      setForm(f => ({ ...f, customer_phone: order.customer_phone || '' }));
+
+      // Nếu đơn chỉ có 1 sản phẩm → tự chọn luôn
+      const firstId = items[0]?.product_id || items[0]?.product?.toString() || items[0]?.product || '';
+      if (items.length === 1 && firstId) {
+        setForm(f => ({ ...f, product_id: firstId }));
+      }
+
+      // Danh sách sản phẩm trong đơn để chọn
+      setOrderItems(items.map(i => ({
+        id: i.product_id || i.product?.toString() || i.product || '',
+        name: i.name || i.product_name || 'Sản phẩm'
+      })));
+
+      setOrderInfo(order);
+    }).catch(() => {
+      toast('Không tìm thấy đơn hàng', 'error');
+    });
   }, [orderId]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.product_id) return toast('Vui lòng chọn sản phẩm', 'error');
+    if (!form.customer_phone) return toast('Vui lòng nhập SĐT khách', 'error');
     setLoading(true);
     try {
-      await api.post('/warranty/admin', form);
+      await api.post('/admin/warranty', form);
       toast('Tạo phiếu bảo hành thành công!', 'success');
       navigate('/admin/orders');
-    } catch (err) { toast(err.error || 'Lỗi tạo phiếu bảo hành', 'error'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      toast(err.error || 'Lỗi tạo phiếu bảo hành', 'error');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -2494,6 +2412,14 @@ function AdminWarrantyFormPage() {
         <button onClick={() => navigate('/admin/orders')} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-muted)', cursor: 'pointer' }}>←</button>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>🛡️ Cấp phiếu bảo hành</h1>
       </div>
+
+      {/* Thông tin đơn hàng */}
+      {orderInfo && (
+        <div style={{ background: '#e3f2fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14 }}>
+          <strong>Đơn #{orderInfo.id || orderId}</strong> — {orderInfo.customer_name} — {orderInfo.shipping_address}
+        </div>
+      )}
+
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: 'var(--shadow)' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -2506,11 +2432,14 @@ function AdminWarrantyFormPage() {
               <input value={form.customer_phone} onChange={e => set('customer_phone', e.target.value)} placeholder="0918 058 495" style={styles.input} />
             </div>
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Sản phẩm *</label>
+              <label style={styles.label}>Sản phẩm bảo hành *</label>
               <select value={form.product_id} onChange={e => set('product_id', e.target.value)} style={styles.input}>
-                <option value="">-- Chọn sản phẩm --</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="">-- Chọn sản phẩm trong đơn --</option>
+                {orderItems.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+              {orderItems.length === 0 && orderId && (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Đang tải sản phẩm từ đơn hàng...</p>
+              )}
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Số serial (nếu có)</label>
@@ -2548,24 +2477,24 @@ function AdminWarrantyFormPage() {
   );
 }
 
-// // ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
+// ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
 
-// function RequireLogin({ children }) {
-//   const { user } = useAuth();
-//   const navigate = useNavigate();
-//   const toast = useToast();
-//   useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
-//   if (!user) return null;
-//   return children;
-// }
+function RequireLogin({ children }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
+  useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
+  if (!user) return null;
+  return children;
+}
 
-// function RequireAdmin({ children }) {
-//   const { user, isAdmin } = useAuth();
-//   const navigate = useNavigate();
-//   useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
-//   if (!user || !isAdmin) return null;
-//   return children;
-// }
+function RequireAdmin({ children }) {
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
+  if (!user || !isAdmin) return null;
+  return children;
+}
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 
