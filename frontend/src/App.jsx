@@ -2479,22 +2479,22 @@ function AdminWarrantyFormPage() {
 
 // ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
 
-function RequireLogin({ children }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const toast = useToast();
-  useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
-  if (!user) return null;
-  return children;
-}
+// function RequireLogin({ children }) {
+//   const { user } = useAuth();
+//   const navigate = useNavigate();
+//   const toast = useToast();
+//   useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
+//   if (!user) return null;
+//   return children;
+// }
 
-function RequireAdmin({ children }) {
-  const { user, isAdmin } = useAuth();
-  const navigate = useNavigate();
-  useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
-  if (!user || !isAdmin) return null;
-  return children;
-}
+// function RequireAdmin({ children }) {
+//   const { user, isAdmin } = useAuth();
+//   const navigate = useNavigate();
+//   useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
+//   if (!user || !isAdmin) return null;
+//   return children;
+// }
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 
