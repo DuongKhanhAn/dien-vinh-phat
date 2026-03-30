@@ -66,17 +66,23 @@ router.post('/products', async (req, res) => {
     if (!name || !slug || !price || !category_id)
       return res.status(400).json({ error: 'Thiếu thông tin bắt buộc' });
 
-    // Frontend gửi specs là JSON string hoặc object, upsell_ids là JSON string hoặc array
+    // specs nhận là plain object từ frontend (không còn JSON string)
     let specs = {};
-    try { specs = typeof req.body.specs === 'string' ? JSON.parse(req.body.specs || '{}') : (req.body.specs || {}); }
-    catch { specs = {}; }
+    const rawSpecs = req.body.specs;
+    if (rawSpecs && typeof rawSpecs === 'string') {
+      try { specs = JSON.parse(rawSpecs); } catch { specs = {}; }
+    } else if (rawSpecs && typeof rawSpecs === 'object') {
+      specs = rawSpecs;
+    }
 
+    // upsell_ids nhận là array strings/IDs, lọc bỏ rỗng
     let upsell_ids = [];
-    try {
-      const raw = typeof req.body.upsell_ids === 'string' ? JSON.parse(req.body.upsell_ids || '[]') : (req.body.upsell_ids || []);
-      // Lọc bỏ giá trị rỗng/không hợp lệ
-      upsell_ids = Array.isArray(raw) ? raw.filter(x => x && x !== '' && x !== 0) : [];
-    } catch { upsell_ids = []; }
+    const rawUids = req.body.upsell_ids;
+    if (Array.isArray(rawUids)) {
+      upsell_ids = rawUids.filter(x => x && x !== '' && x !== '0');
+    } else if (typeof rawUids === 'string') {
+      try { upsell_ids = JSON.parse(rawUids).filter(x => x && x !== ''); } catch { upsell_ids = []; }
+    }
 
     const p = await Product.create({
       name, slug, brand: brand || undefined, price, stock, min_stock, weight_kg,
@@ -97,17 +103,22 @@ router.patch('/products/:id', async (req, res) => {
     if (category_id) update.category = category_id;
     if (is_active !== undefined) update.is_active = is_active === true || is_active === 1 || is_active === 'true';
 
-    // Parse specs nếu là string
-    if (update.specs && typeof update.specs === 'string') {
-      try { update.specs = JSON.parse(update.specs); } catch { delete update.specs; }
+    // specs: nhận là object trực tiếp hoặc string fallback
+    if (update.specs !== undefined) {
+      if (typeof update.specs === 'string') {
+        try { update.specs = JSON.parse(update.specs); } catch { delete update.specs; }
+      }
+      // Nếu là object → giữ nguyên, Mongoose Map tự cast
     }
 
-    // Parse upsell_ids nếu là string
-    if (update.upsell_ids && typeof update.upsell_ids === 'string') {
-      try {
-        const parsed = JSON.parse(update.upsell_ids);
-        update.upsell_ids = Array.isArray(parsed) ? parsed.filter(x => x && x !== '') : [];
-      } catch { delete update.upsell_ids; }
+    // upsell_ids: nhận là array
+    if (update.upsell_ids !== undefined) {
+      if (!Array.isArray(update.upsell_ids)) {
+        try { update.upsell_ids = JSON.parse(update.upsell_ids || '[]').filter(Boolean); }
+        catch { delete update.upsell_ids; }
+      } else {
+        update.upsell_ids = update.upsell_ids.filter(x => x && x !== '');
+      }
     }
 
     await Product.findByIdAndUpdate(req.params.id, update);
