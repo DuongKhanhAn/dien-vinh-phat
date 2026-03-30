@@ -1971,10 +1971,33 @@ function AdminProductFormPage() {
     api.get('/categories').then(setCategories);
     if (isEdit) {
       api.get(`/admin/products/${id}`).then(p => {
-        setForm({ name:p.name, slug:p.slug, brand:p.brand||'', price:p.price, stock:p.stock, min_stock:p.min_stock||5,
-          weight_kg:p.weight_kg||1, description:p.description||'', image_url:p.image_url||'', category_id:p.category_id, is_active:p.is_active });
-        setSpecsRaw(JSON.stringify(JSON.parse(p.specs||'{}'), null, 2));
-        setUpsellRaw((JSON.parse(p.upsell_ids||'[]')).join(', '));
+        // category_id: SQLite dùng category_id số, MongoDB dùng category ObjectId
+        const catId = p.category_id || p.category?._id || p.category || '';
+        setForm({
+          name: p.name || '', slug: p.slug || '', brand: p.brand || '',
+          price: p.price || '', stock: p.stock ?? '', min_stock: p.min_stock ?? 5,
+          weight_kg: p.weight_kg || 1,
+          description: p.description || '', image_url: p.image_url || '',
+          category_id: catId.toString(),
+          is_active: p.is_active === false || p.is_active === 0 ? 0 : 1
+        });
+        // specs: có thể là object, Map hoặc JSON string
+        let specsObj = {};
+        if (p.specs && typeof p.specs === 'string') {
+          try { specsObj = JSON.parse(p.specs); } catch { specsObj = {}; }
+        } else if (p.specs && typeof p.specs === 'object') {
+          specsObj = p.specs;
+        }
+        setSpecsRaw(Object.keys(specsObj).length ? JSON.stringify(specsObj, null, 2) : '');
+
+        // upsell_ids: có thể là array, JSON string hoặc rỗng
+        let upsellArr = [];
+        if (p.upsell_ids && typeof p.upsell_ids === 'string') {
+          try { upsellArr = JSON.parse(p.upsell_ids); } catch { upsellArr = []; }
+        } else if (Array.isArray(p.upsell_ids)) {
+          upsellArr = p.upsell_ids;
+        }
+        setUpsellRaw(upsellArr.filter(Boolean).join(', '));
       }).catch(() => navigate('/admin/products'));
     }
   }, [id]);
@@ -1997,9 +2020,23 @@ function AdminProductFormPage() {
 
     setLoading(true);
     try {
-      const payload = { ...form, price: parseFloat(form.price), stock: parseInt(form.stock)||0,
-        min_stock: parseInt(form.min_stock)||5, weight_kg: parseFloat(form.weight_kg)||1,
-        specs: JSON.stringify(specs), upsell_ids: JSON.stringify(upsell_ids) };
+      const payload = {
+        name: form.name,
+        slug: form.slug,
+        brand: form.brand || undefined,
+        price: parseFloat(form.price),
+        stock: parseInt(form.stock) || 0,
+        min_stock: parseInt(form.min_stock) || 5,
+        weight_kg: parseFloat(form.weight_kg) || 1,
+        description: form.description || undefined,
+        image_url: form.image_url || undefined,
+        category_id: form.category_id,
+        is_active: form.is_active === 1 || form.is_active === true,
+        // Gửi specs là JSON string để backend tự parse (tương thích cả SQLite và MongoDB)
+        specs: JSON.stringify(specs),
+        // upsell_ids: gửi JSON string, backend sẽ parse
+        upsell_ids: JSON.stringify(upsell_ids.filter(Boolean))
+      };
       if (isEdit) await api.patch(`/admin/products/${id}`, payload);
       else await api.post('/admin/products', payload);
       toast(isEdit ? 'Cập nhật thành công!' : 'Thêm sản phẩm thành công!', 'success');
@@ -2035,7 +2072,10 @@ function AdminProductFormPage() {
               <label style={styles.label}>Danh mục *</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)} style={styles.input}>
                 <option value="">-- Chọn danh mục --</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
+                {categories.map(c => {
+                  const catId = c._id || c.id;
+                  return <option key={catId} value={catId}>{c.icon} {c.name}</option>;
+                })}
               </select>
             </div>
             <div style={styles.formGroup}>
@@ -2270,7 +2310,9 @@ function AdminCouponsPage() {
             {form.type !== 'free_ship' && (
               <div style={styles.formGroup}>
                 <label style={styles.label}>{form.type === 'percent' ? 'Phần trăm (%) *' : 'Số tiền giảm (₫) *'}</label>
-                <input value={form.value} onChange={e => set('value', e.target.value)} type="number" min="0.01" step={form.type === 'percent' ? '1' : '1000'} placeholder={form.type === 'percent' ? '20' : '50000'} style={styles.input} />
+                <input value={form.value} onChange={e => set('value', e.target.value)}
+                  type="number" min="0" step={form.type === 'percent' ? '1' : '1000'}
+                  placeholder={form.type === 'percent' ? 'Ví dụ: 10 (giảm 10%)' : 'Ví dụ: 50000'} style={styles.input} />
               </div>
             )}
             {form.type === 'free_ship' && (
@@ -2479,22 +2521,22 @@ function AdminWarrantyFormPage() {
 
 // ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
 
-// function RequireLogin({ children }) {
-//   const { user } = useAuth();
-//   const navigate = useNavigate();
-//   const toast = useToast();
-//   useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
-//   if (!user) return null;
-//   return children;
-// }
+function RequireLogin({ children }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
+  useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
+  if (!user) return null;
+  return children;
+}
 
-// function RequireAdmin({ children }) {
-//   const { user, isAdmin } = useAuth();
-//   const navigate = useNavigate();
-//   useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
-//   if (!user || !isAdmin) return null;
-//   return children;
-// }
+function RequireAdmin({ children }) {
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
+  if (!user || !isAdmin) return null;
+  return children;
+}
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 
