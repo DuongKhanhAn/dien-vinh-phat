@@ -113,38 +113,6 @@ function CartProvider({ children }) {
   );
 }
 
-// ─── REQUIRE LOGIN (wrapper) ──────────────────────────────────────────────────
-
-function RequireLogin({ children }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const toast = useToast();
-
-  useEffect(() => {
-    if (!user) {
-      toast('Vui lòng đăng nhập để tiếp tục!', 'error');
-      navigate('/login');
-    }
-  }, [user]);
-
-  if (!user) return null;
-  return children;
-}
-
-// ─── REQUIRE ADMIN (wrapper) ──────────────────────────────────────────────────
-
-function RequireAdmin({ children }) {
-  const { user, isAdmin } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!user || !isAdmin) navigate('/');
-  }, [user, isAdmin]);
-
-  if (!user || !isAdmin) return null;
-  return children;
-}
-
 // ─── HEADER ──────────────────────────────────────────────────────────────────
 
 function Header() {
@@ -1978,9 +1946,6 @@ function AdminProductsPage() {
 
 // ─── ADMIN: PRODUCT FORM ──────────────────────────────────────────────────────
 
-
-// ─── ADMIN: PRODUCT FORM ──────────────────────────────────────────────────────
-
 function AdminProductFormPage() {
   const { id } = useParams();
   const isEdit = !!id;
@@ -2417,22 +2382,22 @@ function AdminWarrantyFormPage() {
 
 // ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
 
-// function RequireLogin({ children }) {
-//   const { user } = useAuth();
-//   const navigate = useNavigate();
-//   const toast = useToast();
-//   useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
-//   if (!user) return null;
-//   return children;
-// }
+function RequireLogin({ children }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const toast = useToast();
+  useEffect(() => { if (!user) { toast('Vui lòng đăng nhập!', 'error'); navigate('/login'); } }, [user]);
+  if (!user) return null;
+  return children;
+}
 
-// function RequireAdmin({ children }) {
-//   const { user, isAdmin } = useAuth();
-//   const navigate = useNavigate();
-//   useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
-//   if (!user || !isAdmin) return null;
-//   return children;
-// }
+function RequireAdmin({ children }) {
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => { if (!user || !isAdmin) navigate('/'); }, [user, isAdmin]);
+  if (!user || !isAdmin) return null;
+  return children;
+}
 
 // ─── APP ROOT ─────────────────────────────────────────────────────────────────
 
