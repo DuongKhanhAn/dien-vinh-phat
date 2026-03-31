@@ -2425,7 +2425,7 @@ function AdminCouponsPage() {
             {form.type !== 'free_ship' && (
               <div style={styles.formGroup}>
                 <label style={styles.label}>{form.type === 'percent' ? 'Phần trăm (%) *' : 'Số tiền giảm (₫) *'}</label>
-                <input value={form.value} onChange={e => set('value', e.target.value)} type="number" min="0.01" step={form.type === 'percent' ? '1' : '1000'} placeholder={form.type === 'percent' ? '20' : '50000'} style={styles.input} />
+                <input value={form.value} onChange={e => set('value', e.target.value)} type="number" min="0" step={form.type === 'percent' ? '1' : '1000'} placeholder={form.type === 'percent' ? '20' : '50000'} style={styles.input} />
               </div>
             )}
             {form.type === 'free_ship' && (
