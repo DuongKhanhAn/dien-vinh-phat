@@ -1,110 +1,7 @@
 // src/App.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import api from './api';
-
-// ─── STYLES ───────────────────────────────────────────────────────────────────
-
-const styles = {
-  header: { background: 'var(--primary)', color: '#fff', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' },
-  headerInner: { display: 'flex', alignItems: 'center', gap: 16, height: 64 },
-  logo: { display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 20, whiteSpace: 'nowrap' },
-  logoIcon: { fontSize: 24 },
-  searchForm: { flex: 1, display: 'flex', maxWidth: 480 },
-  searchInput: { flex: 1, padding: '8px 14px', borderRadius: '8px 0 0 8px', border: 'none', fontSize: 14, outline: 'none' },
-  searchBtn: { padding: '8px 14px', background: '#ffcc02', borderRadius: '0 8px 8px 0', fontSize: 16, border: 'none', cursor: 'pointer' },
-  headerActions: { display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' },
-  cartBtn: { display: 'flex', alignItems: 'center', gap: 4, color: '#fff', fontWeight: 600, position: 'relative', fontSize: 15 },
-  cartBadge: { background: '#ffcc02', color: '#333', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, position: 'absolute', top: -8, right: 30 },
-  userBtn: { background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '6px 12px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer' },
-  loginBtn: { background: '#fff', color: 'var(--primary)', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600 },
-  dropdown: { position: 'absolute', top: '100%', right: 0, background: '#fff', borderRadius: 10, boxShadow: 'var(--shadow-hover)', minWidth: 210, overflow: 'hidden', marginTop: 8, zIndex: 200 },
-  dropdownItem: { display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', fontSize: 14, color: 'var(--text)', background: 'none', cursor: 'pointer', borderBottom: '1px solid var(--border)', border: 'none' },
-  banner: { padding: '40px 0', position: 'relative' },
-  bannerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 8 },
-  bannerTitle: { color: '#fff', fontSize: 32, fontWeight: 700, marginBottom: 8 },
-  bannerDesc: { color: 'rgba(255,255,255,0.9)', marginBottom: 20, fontSize: 15 },
-  bannerEmoji: { fontSize: 80, opacity: 0.3 },
-  bannerDots: { display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 },
-  dot: { width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', transition: 'all .3s' },
-  dotActive: { background: '#fff', width: 20, borderRadius: 4 },
-  sectionTitle: { fontSize: 20, fontWeight: 700, marginBottom: 16 },
-  catGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 },
-  catCard: { background: '#fff', borderRadius: 12, padding: '16px 12px', textAlign: 'center', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' },
-  catIcon: { fontSize: 28 },
-  catName: { fontWeight: 600, fontSize: 13 },
-  catCount: { fontSize: 12, color: 'var(--text-muted)' },
-  card: { background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow)', display: 'block', transition: 'transform .2s,box-shadow .2s' },
-  cardImgWrap: { position: 'relative', height: 180, overflow: 'hidden' },
-  cardImg: { width: '100%', height: '100%', objectFit: 'cover' },
-  outOfStock: { position: 'absolute', top: 8, left: 8, background: '#888', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 4 },
-  cardBody: { padding: 12 },
-  cardCat: { fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 },
-  cardName: { fontWeight: 600, fontSize: 13, marginBottom: 10, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
-  cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  cardPrice: { color: 'var(--primary)', fontWeight: 700, fontSize: 15 },
-  addBtn: { background: 'var(--primary)', color: '#fff', width: 30, height: 30, borderRadius: 8, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer' },
-  addBtnDisabled: { background: '#ccc', color: '#fff', width: 30, height: 30, borderRadius: 8, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'not-allowed', border: 'none' },
-  trustRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginTop: 48, padding: 24, background: '#fff', borderRadius: 12, boxShadow: 'var(--shadow)' },
-  trustItem: { display: 'flex', gap: 12, alignItems: 'center' },
-  productsLayout: { display: 'flex', gap: 24 },
-  sidebar: { width: 220, flexShrink: 0, background: '#fff', borderRadius: 12, padding: 16, boxShadow: 'var(--shadow)', alignSelf: 'flex-start', position: 'sticky', top: 80 },
-  sidebarTitle: { fontWeight: 700, fontSize: 14, marginBottom: 10 },
-  catItem: { display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, fontSize: 13, background: 'none', color: 'var(--text)', cursor: 'pointer', marginBottom: 2, border: 'none' },
-  catItemActive: { background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 600 },
-  catItemCount: { marginLeft: 'auto', background: 'var(--bg)', borderRadius: 10, padding: '1px 7px', fontSize: 11 },
-  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sortSelect: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 14, outline: 'none' },
-  empty: { textAlign: 'center', padding: 60, color: 'var(--text-muted)', fontSize: 16 },
-  pagination: { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 32 },
-  pageBtn: { width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 14 },
-  pageBtnActive: { background: 'var(--primary)', color: '#fff', border: 'none' },
-  breadcrumb: { fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 },
-  detailLayout: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 },
-  detailImgWrap: { borderRadius: 16, overflow: 'hidden', background: '#fff', boxShadow: 'var(--shadow)' },
-  detailImg: { width: '100%', height: 380, objectFit: 'cover' },
-  detailInfo: { display: 'flex', flexDirection: 'column', gap: 12 },
-  detailTitle: { fontSize: 22, fontWeight: 700, lineHeight: 1.4 },
-  detailPrice: { fontSize: 28, fontWeight: 700, color: 'var(--primary)' },
-  stockRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  qtyRow: { display: 'flex', alignItems: 'center', gap: 16 },
-  qtyCtrl: { display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' },
-  qtyBtn: { width: 36, height: 36, background: '#f5f5f5', border: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  qtyVal: { width: 44, textAlign: 'center', fontWeight: 600 },
-  descBox: { background: '#f9f9f9', borderRadius: 10, padding: 16, marginTop: 4 },
-  cmpTh: { padding: '14px 12px', textAlign: 'center', fontWeight: 600, fontSize: 13, borderBottom: '2px solid var(--border)', verticalAlign: 'top' },
-  cmpLabel: { padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg)', whiteSpace: 'nowrap' },
-  cmpCell: { padding: '10px 12px', fontSize: 13, textAlign: 'center', verticalAlign: 'middle' },
-  cartLayout: { display: 'flex', gap: 24, alignItems: 'flex-start' },
-  cartItem: { display: 'flex', alignItems: 'center', gap: 16, background: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, boxShadow: 'var(--shadow)' },
-  cartItemImg: { width: 72, height: 72, objectFit: 'cover', borderRadius: 8 },
-  removeBtn: { background: 'none', color: '#bbb', fontSize: 16, padding: 4, cursor: 'pointer', border: 'none' },
-  cartSummary: { width: 300, flexShrink: 0, background: '#fff', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow)', position: 'sticky', top: 80 },
-  summaryRow: { display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 15 },
-  emptyCart: { textAlign: 'center', padding: '80px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
-  formGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontSize: 13, fontWeight: 600, color: 'var(--text)' },
-  input: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#fff' },
-  payOpt: { flex: 1, padding: '12px', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center' },
-  payOptActive: { border: '2px solid var(--primary)', background: 'var(--primary-light)' },
-  infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14, borderBottom: '1px solid var(--border)' },
-  tabBtn: { padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
-  tabBtnActive: { background: 'var(--primary)', color: '#fff', border: 'none' },
-  adminOrderCard: { background: '#fff', borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)' },
-  adminOrderHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  btn2: { padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  th: { padding: '12px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' },
-  td: { padding: '12px 14px', fontSize: 14, verticalAlign: 'middle' },
-  footer: { background: '#1a1a1a', color: '#fff', padding: '40px 0 20px' },
-  footerGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 32, marginBottom: 32 },
-  footerLogo: { fontSize: 20, fontWeight: 700, color: '#ffcc02', marginBottom: 12 },
-  footerHeading: { fontWeight: 600, marginBottom: 12, fontSize: 15 },
-  footerText: { color: '#aaa', fontSize: 13, marginBottom: 6 },
-  footerBottom: { borderTop: '1px solid #333', paddingTop: 16, textAlign: 'center', color: '#666', fontSize: 13 },
-};
-
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -215,6 +112,38 @@ function CartProvider({ children }) {
     </CartContext.Provider>
   );
 }
+
+// // ─── REQUIRE LOGIN (wrapper) ──────────────────────────────────────────────────
+
+// function RequireLogin({ children }) {
+//   const { user } = useAuth();
+//   const navigate = useNavigate();
+//   const toast = useToast();
+
+//   useEffect(() => {
+//     if (!user) {
+//       toast('Vui lòng đăng nhập để tiếp tục!', 'error');
+//       navigate('/login');
+//     }
+//   }, [user]);
+
+//   if (!user) return null;
+//   return children;
+// }
+
+// // ─── REQUIRE ADMIN (wrapper) ──────────────────────────────────────────────────
+
+// function RequireAdmin({ children }) {
+//   const { user, isAdmin } = useAuth();
+//   const navigate = useNavigate();
+
+//   useEffect(() => {
+//     if (!user || !isAdmin) navigate('/');
+//   }, [user, isAdmin]);
+
+//   if (!user || !isAdmin) return null;
+//   return children;
+// }
 
 // ─── HEADER ──────────────────────────────────────────────────────────────────
 
@@ -749,7 +678,7 @@ function ProductsPage() {
 // ─── PRODUCT DETAIL PAGE ──────────────────────────────────────────────────────
 
 function ProductDetailPage() {
-  const { slug } = useParams();
+  const slug = window.location.pathname.split('/').pop();
   const [data, setData] = useState(null);
   const [qty, setQty] = useState(1);
   const [reviews, setReviews] = useState(null);
@@ -763,46 +692,22 @@ function ProductDetailPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!slug) return;
-    setData(null);
     api.get(`/products/${slug}`).then(d => {
       setData(d);
-      const pid = d.product._id || d.product.id;
-      api.get(`/reviews/${pid}`).then(setReviews).catch(() => {});
-
-      // upsell_ids: có thể là array hoặc JSON string
-      let ids = [];
-      try {
-        const raw = d.product.upsell_ids;
-        if (Array.isArray(raw)) ids = raw.filter(Boolean);
-        else if (typeof raw === 'string') ids = JSON.parse(raw).filter(Boolean);
-      } catch { ids = []; }
-
+      api.get(`/reviews/${d.product.id}`).then(setReviews);
+      const ids = JSON.parse(d.product.upsell_ids || '[]');
       if (ids.length) {
         Promise.all(ids.map(id => api.get(`/products/id/${id}`).catch(() => null)))
           .then(list => setUpsells(list.filter(Boolean)));
       }
     }).catch(() => navigate('/products'));
-
     if (user) api.get('/orders/my').then(o => setMyOrders(o)).catch(() => {});
     window.scrollTo(0, 0);
   }, [slug]);
 
   if (!data) return <div className="spinner" />;
   const { product, related } = data;
-
-  // specs: MongoDB trả Map object hoặc plain object, SQLite trả JSON string
-  let specs = {};
-  try {
-    if (product.specs && typeof product.specs === 'string') {
-      specs = JSON.parse(product.specs);
-    } else if (product.specs && typeof product.specs === 'object') {
-      // MongoDB Map hoặc plain object
-      specs = product.specs instanceof Map
-        ? Object.fromEntries(product.specs)
-        : product.specs;
-    }
-  } catch { specs = {}; }
+  const specs = JSON.parse(product.specs || '{}');
   const hasSpecs = Object.keys(specs).length > 0;
   const isAdmin = user?.role === 'admin';
 
@@ -814,12 +719,11 @@ function ProductDetailPage() {
 
   const submitReview = async () => {
     if (!reviewForm.order_id) return toast('Chọn đơn hàng của bạn', 'error');
-    const pid = product._id || product.id;
     try {
-      await api.post('/reviews', { product_id: pid, ...reviewForm });
+      await api.post('/reviews', { product_id: product.id, ...reviewForm });
       toast('Cảm ơn đánh giá của bạn!', 'success');
       setShowReviewForm(false);
-      api.get(`/reviews/${pid}`).then(setReviews);
+      api.get(`/reviews/${product.id}`).then(setReviews);
     } catch (err) {
       toast(err.error || 'Không thể gửi đánh giá', 'error');
     }
@@ -1388,7 +1292,7 @@ const STATUS_MAP = {
 };
 
 function OrderDetailPage() {
-  const { id } = useParams();
+  const id = window.location.pathname.split('/').pop();
   const [data, setData] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const { user } = useAuth();
@@ -2049,18 +1953,18 @@ function AdminProductsPage() {
 
 // ─── ADMIN: PRODUCT FORM ──────────────────────────────────────────────────────
 
+
 function AdminProductFormPage() {
-  const { id } = useParams();
-  const isEdit = !!id;
+  const isEdit = window.location.pathname.includes('/edit/');
+  const id = isEdit ? window.location.pathname.split('/').pop() : null;
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  // specs dạng array [{key, value}] thay vì JSON string
-  const [specRows, setSpecRows] = useState([{ key: '', value: '' }]);
+  const [specsRaw, setSpecsRaw] = useState('');
   const [upsellRaw, setUpsellRaw] = useState('');
   const [form, setForm] = useState({
-    name: '', slug: '', brand: '', price: '', stock: '', min_stock: '5',
-    weight_kg: '1', description: '', image_url: '', category_id: '', is_active: 1
+    name:'', slug:'', brand:'', price:'', stock:'', min_stock:'5', weight_kg:'1',
+    description:'', image_url:'', category_id:'', is_active:1
   });
   const toast = useToast();
   const navigate = useNavigate();
@@ -2070,34 +1974,16 @@ function AdminProductFormPage() {
     api.get('/categories').then(setCategories);
     if (isEdit) {
       api.get(`/admin/products/${id}`).then(p => {
-        const catId = p.category_id || p.category?._id || p.category || '';
         setForm({
-          name: p.name || '', slug: p.slug || '', brand: p.brand || '',
-          price: p.price || '', stock: p.stock ?? '', min_stock: p.min_stock ?? 5,
-          weight_kg: p.weight_kg || 1,
-          description: p.description || '', image_url: p.image_url || '',
-          category_id: catId.toString(),
-          is_active: (p.is_active === false || p.is_active === 0) ? 0 : 1
+          name: p.name, slug: p.slug, brand: p.brand || '',
+          price: p.price, stock: p.stock, min_stock: p.min_stock || 5,
+          weight_kg: p.weight_kg || 1, description: p.description || '',
+          image_url: p.image_url || '', category_id: p.category_id || p.category || '',
+          is_active: p.is_active ? 1 : 0
         });
-
-        // Parse specs sang array [{key, value}]
-        let specsObj = {};
-        try {
-          if (p.specs && typeof p.specs === 'string') specsObj = JSON.parse(p.specs);
-          else if (p.specs && typeof p.specs === 'object') specsObj = Object.fromEntries(
-            p.specs instanceof Map ? p.specs : Object.entries(p.specs)
-          );
-        } catch { specsObj = {}; }
-        const rows = Object.entries(specsObj).map(([key, value]) => ({ key, value: String(value) }));
-        setSpecRows(rows.length ? rows : [{ key: '', value: '' }]);
-
-        // upsell_ids
-        let upsellArr = [];
-        try {
-          const raw = p.upsell_ids;
-          upsellArr = Array.isArray(raw) ? raw.filter(Boolean) : JSON.parse(raw || '[]').filter(Boolean);
-        } catch { upsellArr = []; }
-        setUpsellRaw(upsellArr.join(', '));
+        const specs = p.specs instanceof Object && !Array.isArray(p.specs) ? p.specs : {};
+        setSpecsRaw(JSON.stringify(specs, null, 2));
+        setUpsellRaw((p.upsell_ids || []).join(', '));
       }).catch(() => navigate('/admin/products'));
     }
   }, [id]);
@@ -2110,64 +1996,57 @@ function AdminProductFormPage() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Spec rows helpers
-  const setSpecRow = (i, field, val) => setSpecRows(rows =>
-    rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r)
-  );
-  const addSpecRow = () => setSpecRows(r => [...r, { key: '', value: '' }]);
-  const removeSpecRow = i => setSpecRows(r => r.filter((_, idx) => idx !== i));
-
-  // Upload ảnh
+  // Upload ảnh lên Cloudinary qua backend
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast('Ảnh không quá 5MB', 'error');
+    if (file.size > 5 * 1024 * 1024) return toast('Ảnh không được quá 5MB', 'error');
+
     setUploading(true);
     try {
-      const fd = new FormData();
-      fd.append('image', file);
+      const formData = new FormData();
+      formData.append('image', file);
       const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: fd
+        body: formData
       });
       const data = await res.json();
-      if (data.url) { set('image_url', data.url); toast('Tải ảnh thành công!', 'success'); }
-      else throw new Error(data.error || 'Upload thất bại');
-    } catch (err) { toast(err.message, 'error'); }
-    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
+      if (data.url) {
+        set('image_url', data.url);
+        toast('Tải ảnh lên thành công!', 'success');
+      } else {
+        throw new Error(data.error || 'Upload thất bại');
+      }
+    } catch (err) {
+      toast(err.message || 'Lỗi tải ảnh', 'error');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.price || !form.category_id)
-      return toast('Vui lòng điền đủ: Tên, Giá, Danh mục', 'error');
+    if (!form.name || !form.price || !form.category_id) return toast('Thiếu thông tin bắt buộc!', 'error');
 
-    // Build specs object từ rows, bỏ dòng trống
-    const specsObj = {};
-    specRows.forEach(r => { if (r.key.trim()) specsObj[r.key.trim()] = r.value.trim(); });
+    let specs = {};
+    try { specs = specsRaw.trim() ? JSON.parse(specsRaw) : {}; }
+    catch { return toast('Thông số kỹ thuật không đúng định dạng JSON', 'error'); }
 
-    // upsell_ids: lọc bỏ rỗng
     const upsell_ids = upsellRaw.split(',').map(s => s.trim()).filter(Boolean);
 
     setLoading(true);
     try {
       const payload = {
-        name: form.name.trim(),
-        slug: form.slug.trim(),
-        brand: form.brand.trim() || undefined,
+        ...form,
         price: parseFloat(form.price),
         stock: parseInt(form.stock) || 0,
         min_stock: parseInt(form.min_stock) || 5,
         weight_kg: parseFloat(form.weight_kg) || 1,
-        description: form.description.trim() || undefined,
-        image_url: form.image_url.trim() || undefined,
-        category_id: form.category_id,
         is_active: form.is_active === 1 || form.is_active === true,
-        // Gửi specs là plain object — backend MongoDB sẽ nhận trực tiếp,
-        // backend SQLite sẽ nhận qua JSON.stringify
-        specs: specsObj,
-        upsell_ids: upsell_ids
+        specs,
+        upsell_ids,
+        category_id: form.category_id
       };
 
       if (isEdit) await api.patch(`/admin/products/${id}`, payload);
@@ -2176,8 +2055,10 @@ function AdminProductFormPage() {
       toast(isEdit ? 'Cập nhật thành công!' : 'Thêm sản phẩm thành công!', 'success');
       navigate('/admin/products');
     } catch (err) {
-      toast(err.error || err.message || 'Lỗi khi lưu', 'error');
-    } finally { setLoading(false); }
+      toast(err.error || 'Lỗi khi lưu', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -2189,28 +2070,26 @@ function AdminProductFormPage() {
       </div>
 
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: 'var(--shadow)' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-
-          {/* Hàng 1: Tên */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Tên sản phẩm *</label>
-            <input value={form.name} onChange={e => { set('name', e.target.value); if (!isEdit) set('slug', autoSlug(e.target.value)); }}
-              placeholder="Ấm đun siêu tốc Philips 1.7L" style={styles.input} />
-          </div>
-
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+
+            {/* Tên */}
+            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
+              <label style={styles.label}>Tên sản phẩm *</label>
+              <input value={form.name} onChange={e => { set('name', e.target.value); if (!isEdit) set('slug', autoSlug(e.target.value)); }}
+                placeholder="Ấm đun siêu tốc Philips 1.7L" style={styles.input} />
+            </div>
+
             {/* Slug */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Slug (URL) *</label>
-              <input value={form.slug} onChange={e => set('slug', e.target.value)}
-                placeholder="am-dun-sieu-toc-philips" style={styles.input} />
+              <input value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="am-dun-sieu-toc-philips" style={styles.input} />
             </div>
 
             {/* Thương hiệu */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Thương hiệu</label>
-              <input value={form.brand} onChange={e => set('brand', e.target.value)}
-                placeholder="Philips, Sunhouse, Sharp..." style={styles.input} />
+              <input value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="Philips, Sunhouse..." style={styles.input} />
             </div>
 
             {/* Danh mục */}
@@ -2218,123 +2097,92 @@ function AdminProductFormPage() {
               <label style={styles.label}>Danh mục *</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)} style={styles.input}>
                 <option value="">-- Chọn danh mục --</option>
-                {categories.map(c => {
-                  const cid = (c._id || c.id || '').toString();
-                  return <option key={cid} value={cid}>{c.icon} {c.name}</option>;
-                })}
+                {categories.map(c => <option key={c._id || c.id} value={c._id || c.id}>{c.icon} {c.name}</option>)}
               </select>
             </div>
 
             {/* Giá */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Giá bán (₫) *</label>
-              <input value={form.price} onChange={e => set('price', e.target.value)}
-                type="number" min="0" placeholder="250000" style={styles.input} />
+              <input value={form.price} onChange={e => set('price', e.target.value)} type="number" min="0" placeholder="250000" style={styles.input} />
             </div>
 
             {/* Tồn kho */}
             <div style={styles.formGroup}>
-              <label style={styles.label}>Số lượng tồn kho</label>
-              <input value={form.stock} onChange={e => set('stock', e.target.value)}
-                type="number" min="0" placeholder="100" style={styles.input} />
+              <label style={styles.label}>Tồn kho</label>
+              <input value={form.stock} onChange={e => set('stock', e.target.value)} type="number" min="0" placeholder="100" style={styles.input} />
             </div>
 
             {/* Cảnh báo kho */}
             <div style={styles.formGroup}>
-              <label style={styles.label}>Cảnh báo khi tồn kho dưới</label>
-              <input value={form.min_stock} onChange={e => set('min_stock', e.target.value)}
-                type="number" min="0" placeholder="5" style={styles.input} />
+              <label style={styles.label}>Cảnh báo khi còn dưới</label>
+              <input value={form.min_stock} onChange={e => set('min_stock', e.target.value)} type="number" min="0" placeholder="5" style={styles.input} />
             </div>
 
             {/* Khối lượng */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Khối lượng (kg)</label>
-              <input value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)}
-                type="number" min="0" step="0.1" placeholder="1.5" style={styles.input} />
+              <input value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} type="number" min="0" step="0.1" placeholder="1.5" style={styles.input} />
+            </div>
+
+            {/* Upload ảnh */}
+            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
+              <label style={styles.label}>Ảnh sản phẩm</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <input value={form.image_url} onChange={e => set('image_url', e.target.value)}
+                    placeholder="Nhập URL hoặc upload ảnh bên dưới..." style={styles.input} />
+                  <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input ref={fileRef} type="file" accept="image/*" onChange={handleFileUpload}
+                      style={{ display: 'none' }} />
+                    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                      style={{ ...styles.btn2, fontSize: 13, padding: '7px 14px' }}>
+                      {uploading ? '⏳ Đang tải...' : '📸 Chọn ảnh từ máy'}
+                    </button>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tối đa 5MB, định dạng JPG/PNG/WebP</span>
+                  </div>
+                </div>
+                {form.image_url && (
+                  <img src={form.image_url} alt="preview"
+                    style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', flexShrink: 0 }} />
+                )}
+              </div>
+            </div>
+
+            {/* Mô tả */}
+            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
+              <label style={styles.label}>Mô tả sản phẩm</label>
+              <textarea value={form.description} onChange={e => set('description', e.target.value)}
+                placeholder="Mô tả chi tiết về sản phẩm..."
+                style={{ ...styles.input, height: 90, resize: 'vertical' }} />
+            </div>
+
+            {/* Thông số kỹ thuật JSON */}
+            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
+              <label style={styles.label}>Thông số kỹ thuật (JSON)</label>
+              <textarea value={specsRaw} onChange={e => setSpecsRaw(e.target.value)}
+                placeholder={'{\n  "Công suất": "1200W",\n  "Dung tích": "1.7L",\n  "Chất liệu": "Inox 304"\n}'}
+                style={{ ...styles.input, height: 110, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Nhập theo dạng JSON. Ví dụ: {`{"Công suất": "2200W", "Dung tích": "1.7L"}`}
+              </p>
+            </div>
+
+            {/* Upsell IDs */}
+            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
+              <label style={styles.label}>Gợi ý mua kèm — ID sản phẩm (cách nhau dấu phẩy)</label>
+              <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)}
+                placeholder="id1, id2, id3" style={styles.input} />
             </div>
 
             {/* Trạng thái */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Trạng thái hiển thị</label>
               <select value={form.is_active} onChange={e => set('is_active', parseInt(e.target.value))} style={styles.input}>
-                <option value={1}>Đang bán</option>
-                <option value={0}>Ẩn</option>
+                <option value={1}>Đang bán (hiển thị)</option>
+                <option value={0}>Ẩn (không hiển thị)</option>
               </select>
             </div>
-          </div>
-
-          {/* Upload ảnh */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Ảnh sản phẩm</label>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <div style={{ flex: 1 }}>
-                <input value={form.image_url} onChange={e => set('image_url', e.target.value)}
-                  placeholder="Nhập URL ảnh hoặc upload từ máy bên dưới..." style={styles.input} />
-                <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input ref={fileRef} type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-                    style={{ ...styles.btn2, fontSize: 13, padding: '7px 14px' }}>
-                    {uploading ? '⏳ Đang tải...' : '📸 Chọn ảnh từ máy'}
-                  </button>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tối đa 5MB · JPG/PNG/WebP</span>
-                </div>
-              </div>
-              {form.image_url && (
-                <img src={form.image_url} alt="preview"
-                  style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', flexShrink: 0 }} />
-              )}
-            </div>
-          </div>
-
-          {/* Mô tả */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Mô tả sản phẩm</label>
-            <textarea value={form.description} onChange={e => set('description', e.target.value)}
-              placeholder="Mô tả chi tiết về sản phẩm..."
-              style={{ ...styles.input, height: 90, resize: 'vertical' }} />
-          </div>
-
-          {/* Thông số kỹ thuật — UI key/value thay vì JSON */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Thông số kỹ thuật</label>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
-              Nhập tên thông số và giá trị. Ví dụ: Công suất → 2200W
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {specRows.map((row, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    value={row.key}
-                    onChange={e => setSpecRow(i, 'key', e.target.value)}
-                    placeholder="Tên thông số (VD: Công suất)"
-                    style={{ ...styles.input, flex: 1 }}
-                  />
-                  <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>→</span>
-                  <input
-                    value={row.value}
-                    onChange={e => setSpecRow(i, 'value', e.target.value)}
-                    placeholder="Giá trị (VD: 2200W)"
-                    style={{ ...styles.input, flex: 1 }}
-                  />
-                  <button type="button" onClick={() => removeSpecRow(i)}
-                    disabled={specRows.length === 1}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f44336', fontSize: 18, flexShrink: 0, opacity: specRows.length === 1 ? 0.3 : 1 }}>
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <button type="button" onClick={addSpecRow}
-                style={{ ...styles.btn2, fontSize: 13, padding: '6px 12px', alignSelf: 'flex-start', color: 'var(--primary)', borderColor: 'var(--primary)' }}>
-                + Thêm thông số
-              </button>
-            </div>
-          </div>
-
-          {/* Gợi ý mua kèm */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Gợi ý mua kèm (ID sản phẩm, cách nhau dấu phẩy)</label>
-            <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)}
-              placeholder="Ví dụ: 3, 7, 12 (để trống nếu không có)" style={styles.input} />
           </div>
 
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
@@ -2343,7 +2191,7 @@ function AdminProductFormPage() {
               Huỷ
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading || uploading}
-              style={{ flex: 2, justifyContent: 'center', padding: 14, fontSize: 15 }}>
+              style={{ flex: 2, justifyContent: 'center', padding: 14 }}>
               {loading ? 'Đang lưu...' : isEdit ? '💾 Lưu thay đổi' : '➕ Thêm sản phẩm'}
             </button>
           </div>
@@ -2353,63 +2201,290 @@ function AdminProductFormPage() {
   );
 }
 
+// ─── ADMIN: REPORTS ───────────────────────────────────────────────────────────
+
+function AdminReportsPage() {
+  const [summary, setSummary] = useState(null);
+  const [revenue, setRevenue] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [lowStock, setLowStock] = useState([]);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    api.get('/admin/reports/summary').then(setSummary);
+    api.get('/admin/reports/revenue?months=6').then(setRevenue);
+    api.get('/admin/reports/top-products?limit=8').then(setTopProducts);
+    api.get('/admin/reports/low-stock').then(setLowStock);
+  }, []);
+
+  const maxRevenue = Math.max(...revenue.map(r => r.revenue || 0), 1);
+
+  return (
+    <div className="container" style={{ padding: '24px 16px 48px' }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 24 }}>📊 Báo cáo & Thống kê</h1>
+
+      {/* Summary cards */}
+      {summary && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 32 }}>
+          {[
+            { label: 'Đơn hôm nay', val: summary.today_orders, icon: '📦', color: '#1565c0' },
+            { label: 'Doanh thu tháng', val: `${Math.round(summary.month_revenue/1000)}K₫`, icon: '💰', color: '#2e7d32' },
+            { label: 'Chờ xử lý', val: summary.pending_orders, icon: '⏳', color: '#e65100', link: '/admin/orders' },
+            { label: 'Tổng đơn', val: summary.total_orders, icon: '🛒', color: '#555' },
+            { label: 'Sắp hết hàng', val: summary.low_stock, icon: '⚠️', color: '#c62828', link: '/admin/products' },
+          ].map(x => (
+            <div key={x.label} onClick={() => x.link && navigate(x.link)}
+              style={{ background: '#fff', borderRadius: 12, padding: '16px 18px', boxShadow: 'var(--shadow)',
+                cursor: x.link ? 'pointer' : 'default', borderLeft: `4px solid ${x.color}` }}>
+              <p style={{ fontSize: 24 }}>{x.icon}</p>
+              <p style={{ fontSize: 24, fontWeight: 700, color: x.color, marginTop: 4 }}>{x.val}</p>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{x.label}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Revenue chart */}
+      <div style={{ background: '#fff', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow)', marginBottom: 24 }}>
+        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 20 }}>📈 Doanh thu 6 tháng gần nhất</h2>
+        {revenue.length === 0 ? <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Chưa có dữ liệu</p> : (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 160 }}>
+            {revenue.map(r => {
+              const h = Math.max(8, Math.round((r.revenue / maxRevenue) * 140));
+              return (
+                <div key={r.month} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.2 }}>
+                    {Math.round(r.revenue/1000)}K
+                  </span>
+                  <div style={{ width: '100%', height: h, background: 'var(--primary)', borderRadius: '4px 4px 0 0', transition: 'height .3s', minHeight: 4 }} />
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center' }}>
+                    {r.month?.slice(5)}/{r.month?.slice(2,4)}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.orders} đơn</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {/* Top products */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: 'var(--shadow)' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>🏆 Sản phẩm bán chạy</h2>
+          {topProducts.map((p, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+              <span style={{ fontSize: 16, fontWeight: 700, color: i < 3 ? 'var(--primary)' : 'var(--text-muted)', width: 20 }}>
+                {i + 1}
+              </span>
+              <img src={p.image_url} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Bán: {p.total_sold} · {Math.round(p.total_revenue/1000)}K₫</p>
+              </div>
+            </div>
+          ))}
+          {topProducts.length === 0 && <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Chưa có dữ liệu</p>}
+        </div>
+
+        {/* Low stock */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: 'var(--shadow)' }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>⚠️ Cảnh báo tồn kho</h2>
+          {lowStock.length === 0
+            ? <p style={{ color: 'var(--success)', fontSize: 14 }}>✓ Tất cả sản phẩm đủ hàng</p>
+            : lowStock.map(p => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer' }}
+                onClick={() => navigate(`/admin/products/edit/${p.id}`)}>
+                <img src={p.image_url} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6 }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>{p.category_name}</p>
+                </div>
+                <span style={{ color: p.stock === 0 ? '#f44336' : '#ff9800', fontWeight: 700, fontSize: 14, whiteSpace: 'nowrap' }}>
+                  {p.stock === 0 ? 'Hết hàng' : `Còn ${p.stock}`}
+                </span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ADMIN: COUPONS ───────────────────────────────────────────────────────────
+
+function AdminCouponsPage() {
+  const [coupons, setCoupons] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ code:'', type:'percent', value:'', min_order:'', max_uses:'100', expires_at:'' });
+  const toast = useToast();
+
+  const fetchCoupons = () => { setLoading(true); api.get('/coupons/admin').then(setCoupons).finally(() => setLoading(false)); };
+  useEffect(() => { fetchCoupons(); }, []);
+
+  const createCoupon = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/coupons/admin', form);
+      toast('Tạo mã thành công!', 'success');
+      setShowForm(false);
+      setForm({ code:'', type:'percent', value:'', min_order:'', max_uses:'100', expires_at:'' });
+      fetchCoupons();
+    } catch (err) { toast(err.error || 'Lỗi tạo mã', 'error'); }
+  };
+
+  const toggleCoupon = async (c) => {
+    await api.patch(`/coupons/admin/${c.id}`, { is_active: c.is_active ? 0 : 1 });
+    fetchCoupons();
+  };
+
+  const deleteCoupon = async (id) => {
+    if (!window.confirm('Xoá mã này?')) return;
+    await api.delete(`/coupons/admin/${id}`);
+    toast('Đã xoá', 'success'); fetchCoupons();
+  };
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const typeLabel = { percent: 'Giảm %', fixed: 'Giảm tiền cố định', free_ship: 'Miễn phí ship' };
+
+  return (
+    <div className="container" style={{ padding: '24px 16px 48px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>🏷️ Quản lý mã giảm giá</h1>
+        <button className="btn btn-primary" onClick={() => setShowForm(f => !f)}>
+          {showForm ? 'Đóng' : '+ Tạo mã mới'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: 'var(--shadow)' }}>
+          <form onSubmit={createCoupon} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Mã giảm giá *</label>
+              <input value={form.code} onChange={e => set('code', e.target.value.toUpperCase())} placeholder="SUMMER20" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Loại *</label>
+              <select value={form.type} onChange={e => set('type', e.target.value)} style={styles.input}>
+                <option value="percent">Giảm % (ví dụ: 20%)</option>
+                <option value="fixed">Giảm tiền cố định</option>
+                <option value="free_ship">Miễn phí vận chuyển</option>
+              </select>
+            </div>
+            {form.type !== 'free_ship' && (
+              <div style={styles.formGroup}>
+                <label style={styles.label}>{form.type === 'percent' ? 'Phần trăm (%) *' : 'Số tiền giảm (₫) *'}</label>
+                <input value={form.value} onChange={e => set('value', e.target.value)} type="number" min="0.01" step={form.type === 'percent' ? '1' : '1000'} placeholder={form.type === 'percent' ? '20' : '50000'} style={styles.input} />
+              </div>
+            )}
+            {form.type === 'free_ship' && (
+              <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
+                <div style={{ background: '#e3f2fd', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#1565c0' }}>
+                  💡 Mã miễn phí vận chuyển — không cần nhập giá trị giảm
+                </div>
+              </div>
+            )}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Đơn hàng tối thiểu (₫)</label>
+              <input value={form.min_order} onChange={e => set('min_order', e.target.value)} type="number" min="0" placeholder="0" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Số lần dùng tối đa</label>
+              <input value={form.max_uses} onChange={e => set('max_uses', e.target.value)} type="number" min="1" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Hết hạn (để trống = không hết hạn)</label>
+              <input value={form.expires_at} onChange={e => set('expires_at', e.target.value)} type="date" style={styles.input} />
+            </div>
+            <div style={{ gridColumn: '1/-1', display: 'flex', gap: 12 }}>
+              <button type="submit" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>✓ Tạo mã</button>
+              <button type="button" onClick={() => setShowForm(false)} className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }}>Huỷ</button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {loading ? <div className="spinner" /> : (
+        <div style={{ background: '#fff', borderRadius: 12, boxShadow: 'var(--shadow)', overflow: 'auto' }}>
+          <table style={styles.table}>
+            <thead>
+              <tr style={{ background: 'var(--bg)' }}>
+                {['Mã','Loại','Giá trị','Đơn tối thiểu','Đã dùng','Hết hạn','Trạng thái','Thao tác'].map(h => (
+                  <th key={h} style={styles.th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {coupons.map(c => (
+                <tr key={c.id} style={{ borderTop: '1px solid var(--border)', opacity: c.is_active ? 1 : 0.5 }}>
+                  <td style={styles.td}><strong style={{ fontFamily: 'monospace' }}>{c.code}</strong></td>
+                  <td style={styles.td}>{typeLabel[c.type]}</td>
+                  <td style={styles.td}>
+                    {c.type === 'free_ship' ? 'Miễn ship' : c.type === 'percent' ? `${c.value}%` : `${c.value.toLocaleString('vi-VN')}₫`}
+                  </td>
+                  <td style={styles.td}>{c.min_order > 0 ? `${c.min_order.toLocaleString('vi-VN')}₫` : '—'}</td>
+                  <td style={styles.td}>{c.used_count}/{c.max_uses}</td>
+                  <td style={styles.td}>{c.expires_at || '—'}</td>
+                  <td style={styles.td}>
+                    <span style={{ background: c.is_active ? '#e8f5e9' : '#eeeeee', color: c.is_active ? 'var(--success)' : '#888', padding: '2px 8px', borderRadius: 12, fontSize: 12, fontWeight: 600 }}>
+                      {c.is_active ? 'Đang hoạt động' : 'Tắt'}
+                    </span>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button onClick={() => toggleCoupon(c)} style={{ ...styles.btn2, fontSize: 12, padding: '4px 8px' }}>
+                        {c.is_active ? 'Tắt' : 'Bật'}
+                      </button>
+                      <button onClick={() => deleteCoupon(c.id)} style={{ ...styles.btn2, fontSize: 12, padding: '4px 8px', color: '#f44336', borderColor: '#f44336' }}>
+                        🗑️
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {coupons.length === 0 && <p style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>Chưa có mã giảm giá nào</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ADMIN: WARRANTY FORM ─────────────────────────────────────────────────────
 
 function AdminWarrantyFormPage() {
   const orderId = new URLSearchParams(window.location.search).get('order_id') || '';
-  const [form, setForm] = useState({
-    order_id: orderId, product_id: '', customer_phone: '',
-    serial_number: '', imei: '',
-    purchase_date: new Date().toISOString().slice(0, 10),
-    warranty_months: '12', notes: ''
-  });
-  const [orderItems, setOrderItems] = useState([]);
-  const [orderInfo, setOrderInfo] = useState(null);
+  const [form, setForm] = useState({ order_id: orderId, product_id:'', customer_phone:'', serial_number:'', imei:'', purchase_date: new Date().toISOString().slice(0,10), warranty_months:'12', notes:'' });
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!orderId) return;
-    api.get(`/orders/${orderId}`).then(d => {
-      const order = d.order;
-      const items = d.items || [];
-
-      // Tự điền SĐT khách từ đơn hàng
-      setForm(f => ({ ...f, customer_phone: order.customer_phone || '' }));
-
-      // Nếu đơn chỉ có 1 sản phẩm → tự chọn luôn
-      const firstId = items[0]?.product_id || items[0]?.product?.toString() || items[0]?.product || '';
-      if (items.length === 1 && firstId) {
-        setForm(f => ({ ...f, product_id: firstId }));
-      }
-
-      // Danh sách sản phẩm trong đơn để chọn
-      setOrderItems(items.map(i => ({
-        id: i.product_id || i.product?.toString() || i.product || '',
-        name: i.name || i.product_name || 'Sản phẩm'
-      })));
-
-      setOrderInfo(order);
-    }).catch(() => {
-      toast('Không tìm thấy đơn hàng', 'error');
-    });
+    api.get('/admin/products/all').then(setProducts);
+    if (orderId) {
+      api.get(`/orders/${orderId}`).then(d => {
+        setForm(f => ({ ...f, customer_phone: d.order.customer_phone }));
+        if (d.items?.length === 1) setForm(f => ({ ...f, product_id: d.items[0].product_id }));
+        setProducts(d.items?.map(i => ({ id: i.product_id, name: i.name })) || []);
+      }).catch(() => {});
+    }
   }, [orderId]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.product_id) return toast('Vui lòng chọn sản phẩm', 'error');
-    if (!form.customer_phone) return toast('Vui lòng nhập SĐT khách', 'error');
     setLoading(true);
     try {
-      await api.post('/admin/warranty', form);
+      await api.post('/warranty/admin', form);
       toast('Tạo phiếu bảo hành thành công!', 'success');
       navigate('/admin/orders');
-    } catch (err) {
-      toast(err.error || 'Lỗi tạo phiếu bảo hành', 'error');
-    } finally { setLoading(false); }
+    } catch (err) { toast(err.error || 'Lỗi tạo phiếu bảo hành', 'error'); }
+    finally { setLoading(false); }
   };
 
   return (
@@ -2418,14 +2493,6 @@ function AdminWarrantyFormPage() {
         <button onClick={() => navigate('/admin/orders')} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-muted)', cursor: 'pointer' }}>←</button>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>🛡️ Cấp phiếu bảo hành</h1>
       </div>
-
-      {/* Thông tin đơn hàng */}
-      {orderInfo && (
-        <div style={{ background: '#e3f2fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14 }}>
-          <strong>Đơn #{orderInfo.id || orderId}</strong> — {orderInfo.customer_name} — {orderInfo.shipping_address}
-        </div>
-      )}
-
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: 'var(--shadow)' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -2438,14 +2505,11 @@ function AdminWarrantyFormPage() {
               <input value={form.customer_phone} onChange={e => set('customer_phone', e.target.value)} placeholder="0918 058 495" style={styles.input} />
             </div>
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Sản phẩm bảo hành *</label>
+              <label style={styles.label}>Sản phẩm *</label>
               <select value={form.product_id} onChange={e => set('product_id', e.target.value)} style={styles.input}>
-                <option value="">-- Chọn sản phẩm trong đơn --</option>
-                {orderItems.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="">-- Chọn sản phẩm --</option>
+                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              {orderItems.length === 0 && orderId && (
-                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Đang tải sản phẩm từ đơn hàng...</p>
-              )}
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Số serial (nếu có)</label>
@@ -2483,7 +2547,7 @@ function AdminWarrantyFormPage() {
   );
 }
 
-// ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
+// // ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
 
 function RequireLogin({ children }) {
   const { user } = useAuth();
@@ -2550,3 +2614,105 @@ export default function App() {
     </ToastProvider>
   );
 }
+
+// ─── STYLES ───────────────────────────────────────────────────────────────────
+
+const styles = {
+  header: { background: 'var(--primary)', color: '#fff', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 2px 8px rgba(0,0,0,0.2)' },
+  headerInner: { display: 'flex', alignItems: 'center', gap: 16, height: 64 },
+  logo: { display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 20, whiteSpace: 'nowrap' },
+  logoIcon: { fontSize: 24 },
+  searchForm: { flex: 1, display: 'flex', maxWidth: 480 },
+  searchInput: { flex: 1, padding: '8px 14px', borderRadius: '8px 0 0 8px', border: 'none', fontSize: 14, outline: 'none' },
+  searchBtn: { padding: '8px 14px', background: '#ffcc02', borderRadius: '0 8px 8px 0', fontSize: 16, border: 'none', cursor: 'pointer' },
+  headerActions: { display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' },
+  cartBtn: { display: 'flex', alignItems: 'center', gap: 4, color: '#fff', fontWeight: 600, position: 'relative', fontSize: 15 },
+  cartBadge: { background: '#ffcc02', color: '#333', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, position: 'absolute', top: -8, right: 30 },
+  userBtn: { background: 'rgba(255,255,255,0.2)', color: '#fff', padding: '6px 12px', borderRadius: 8, fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer' },
+  loginBtn: { background: '#fff', color: 'var(--primary)', padding: '6px 14px', borderRadius: 8, fontSize: 14, fontWeight: 600 },
+  dropdown: { position: 'absolute', top: '100%', right: 0, background: '#fff', borderRadius: 10, boxShadow: 'var(--shadow-hover)', minWidth: 210, overflow: 'hidden', marginTop: 8, zIndex: 200 },
+  dropdownItem: { display: 'block', width: '100%', textAlign: 'left', padding: '12px 16px', fontSize: 14, color: 'var(--text)', background: 'none', cursor: 'pointer', borderBottom: '1px solid var(--border)', border: 'none' },
+  banner: { padding: '40px 0', position: 'relative' },
+  bannerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  bannerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginBottom: 8 },
+  bannerTitle: { color: '#fff', fontSize: 32, fontWeight: 700, marginBottom: 8 },
+  bannerDesc: { color: 'rgba(255,255,255,0.9)', marginBottom: 20, fontSize: 15 },
+  bannerEmoji: { fontSize: 80, opacity: 0.3 },
+  bannerDots: { display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 },
+  dot: { width: 8, height: 8, borderRadius: '50%', background: 'rgba(255,255,255,0.5)', border: 'none', cursor: 'pointer', transition: 'all .3s' },
+  dotActive: { background: '#fff', width: 20, borderRadius: 4 },
+  sectionTitle: { fontSize: 20, fontWeight: 700, marginBottom: 16 },
+  catGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 },
+  catCard: { background: '#fff', borderRadius: 12, padding: '16px 12px', textAlign: 'center', boxShadow: 'var(--shadow)', display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' },
+  catIcon: { fontSize: 28 },
+  catName: { fontWeight: 600, fontSize: 13 },
+  catCount: { fontSize: 12, color: 'var(--text-muted)' },
+  card: { background: '#fff', borderRadius: 12, overflow: 'hidden', boxShadow: 'var(--shadow)', display: 'block', transition: 'transform .2s,box-shadow .2s' },
+  cardImgWrap: { position: 'relative', height: 180, overflow: 'hidden' },
+  cardImg: { width: '100%', height: '100%', objectFit: 'cover' },
+  outOfStock: { position: 'absolute', top: 8, left: 8, background: '#888', color: '#fff', fontSize: 11, padding: '2px 8px', borderRadius: 4 },
+  cardBody: { padding: 12 },
+  cardCat: { fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 },
+  cardName: { fontWeight: 600, fontSize: 13, marginBottom: 10, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' },
+  cardFooter: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  cardPrice: { color: 'var(--primary)', fontWeight: 700, fontSize: 15 },
+  addBtn: { background: 'var(--primary)', color: '#fff', width: 30, height: 30, borderRadius: 8, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer' },
+  addBtnDisabled: { background: '#ccc', color: '#fff', width: 30, height: 30, borderRadius: 8, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'not-allowed', border: 'none' },
+  trustRow: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 16, marginTop: 48, padding: 24, background: '#fff', borderRadius: 12, boxShadow: 'var(--shadow)' },
+  trustItem: { display: 'flex', gap: 12, alignItems: 'center' },
+  productsLayout: { display: 'flex', gap: 24 },
+  sidebar: { width: 220, flexShrink: 0, background: '#fff', borderRadius: 12, padding: 16, boxShadow: 'var(--shadow)', alignSelf: 'flex-start', position: 'sticky', top: 80 },
+  sidebarTitle: { fontWeight: 700, fontSize: 14, marginBottom: 10 },
+  catItem: { display: 'flex', alignItems: 'center', gap: 6, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, fontSize: 13, background: 'none', color: 'var(--text)', cursor: 'pointer', marginBottom: 2, border: 'none' },
+  catItemActive: { background: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 600 },
+  catItemCount: { marginLeft: 'auto', background: 'var(--bg)', borderRadius: 10, padding: '1px 7px', fontSize: 11 },
+  toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sortSelect: { padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', fontSize: 14, outline: 'none' },
+  empty: { textAlign: 'center', padding: 60, color: 'var(--text-muted)', fontSize: 16 },
+  pagination: { display: 'flex', gap: 8, justifyContent: 'center', marginTop: 32 },
+  pageBtn: { width: 36, height: 36, borderRadius: 8, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 14 },
+  pageBtnActive: { background: 'var(--primary)', color: '#fff', border: 'none' },
+  breadcrumb: { fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 },
+  detailLayout: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32 },
+  detailImgWrap: { borderRadius: 16, overflow: 'hidden', background: '#fff', boxShadow: 'var(--shadow)' },
+  detailImg: { width: '100%', height: 380, objectFit: 'cover' },
+  detailInfo: { display: 'flex', flexDirection: 'column', gap: 12 },
+  detailTitle: { fontSize: 22, fontWeight: 700, lineHeight: 1.4 },
+  detailPrice: { fontSize: 28, fontWeight: 700, color: 'var(--primary)' },
+  stockRow: { display: 'flex', alignItems: 'center', gap: 10 },
+  qtyRow: { display: 'flex', alignItems: 'center', gap: 16 },
+  qtyCtrl: { display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' },
+  qtyBtn: { width: 36, height: 36, background: '#f5f5f5', border: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  qtyVal: { width: 44, textAlign: 'center', fontWeight: 600 },
+  descBox: { background: '#f9f9f9', borderRadius: 10, padding: 16, marginTop: 4 },
+  cmpTh: { padding: '14px 12px', textAlign: 'center', fontWeight: 600, fontSize: 13, borderBottom: '2px solid var(--border)', verticalAlign: 'top' },
+  cmpLabel: { padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--bg)', whiteSpace: 'nowrap' },
+  cmpCell: { padding: '10px 12px', fontSize: 13, textAlign: 'center', verticalAlign: 'middle' },
+  cartLayout: { display: 'flex', gap: 24, alignItems: 'flex-start' },
+  cartItem: { display: 'flex', alignItems: 'center', gap: 16, background: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, boxShadow: 'var(--shadow)' },
+  cartItemImg: { width: 72, height: 72, objectFit: 'cover', borderRadius: 8 },
+  removeBtn: { background: 'none', color: '#bbb', fontSize: 16, padding: 4, cursor: 'pointer', border: 'none' },
+  cartSummary: { width: 300, flexShrink: 0, background: '#fff', borderRadius: 12, padding: 24, boxShadow: 'var(--shadow)', position: 'sticky', top: 80 },
+  summaryRow: { display: 'flex', justifyContent: 'space-between', marginBottom: 10, fontSize: 15 },
+  emptyCart: { textAlign: 'center', padding: '80px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 },
+  formGroup: { display: 'flex', flexDirection: 'column', gap: 6 },
+  label: { fontSize: 13, fontWeight: 600, color: 'var(--text)' },
+  input: { padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#fff' },
+  payOpt: { flex: 1, padding: '12px', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center' },
+  payOptActive: { border: '2px solid var(--primary)', background: 'var(--primary-light)' },
+  infoRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14, borderBottom: '1px solid var(--border)' },
+  tabBtn: { padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500 },
+  tabBtnActive: { background: 'var(--primary)', color: '#fff', border: 'none' },
+  adminOrderCard: { background: '#fff', borderRadius: 12, padding: 20, marginBottom: 16, boxShadow: 'var(--shadow)' },
+  adminOrderHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  btn2: { padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border)', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4 },
+  table: { width: '100%', borderCollapse: 'collapse' },
+  th: { padding: '12px 14px', textAlign: 'left', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' },
+  td: { padding: '12px 14px', fontSize: 14, verticalAlign: 'middle' },
+  footer: { background: '#1a1a1a', color: '#fff', padding: '40px 0 20px' },
+  footerGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 32, marginBottom: 32 },
+  footerLogo: { fontSize: 20, fontWeight: 700, color: '#ffcc02', marginBottom: 12 },
+  footerHeading: { fontWeight: 600, marginBottom: 12, fontSize: 15 },
+  footerText: { color: '#aaa', fontSize: 13, marginBottom: 6 },
+  footerBottom: { borderTop: '1px solid #333', paddingTop: 16, textAlign: 'center', color: '#666', fontSize: 13 },
+};
