@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, Link, useNavigate, useLocation, useParams } from 'react-router-dom';
 import api from './api';
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -112,38 +112,6 @@ function CartProvider({ children }) {
     </CartContext.Provider>
   );
 }
-
-// // ─── REQUIRE LOGIN (wrapper) ──────────────────────────────────────────────────
-
-// function RequireLogin({ children }) {
-//   const { user } = useAuth();
-//   const navigate = useNavigate();
-//   const toast = useToast();
-
-//   useEffect(() => {
-//     if (!user) {
-//       toast('Vui lòng đăng nhập để tiếp tục!', 'error');
-//       navigate('/login');
-//     }
-//   }, [user]);
-
-//   if (!user) return null;
-//   return children;
-// }
-
-// // ─── REQUIRE ADMIN (wrapper) ──────────────────────────────────────────────────
-
-// function RequireAdmin({ children }) {
-//   const { user, isAdmin } = useAuth();
-//   const navigate = useNavigate();
-
-//   useEffect(() => {
-//     if (!user || !isAdmin) navigate('/');
-//   }, [user, isAdmin]);
-
-//   if (!user || !isAdmin) return null;
-//   return children;
-// }
 
 // ─── HEADER ──────────────────────────────────────────────────────────────────
 
@@ -678,7 +646,7 @@ function ProductsPage() {
 // ─── PRODUCT DETAIL PAGE ──────────────────────────────────────────────────────
 
 function ProductDetailPage() {
-  const slug = window.location.pathname.split('/').pop();
+  const { slug } = useParams();
   const [data, setData] = useState(null);
   const [qty, setQty] = useState(1);
   const [reviews, setReviews] = useState(null);
@@ -692,22 +660,46 @@ function ProductDetailPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!slug) return;
+    setData(null);
     api.get(`/products/${slug}`).then(d => {
       setData(d);
-      api.get(`/reviews/${d.product.id}`).then(setReviews);
-      const ids = JSON.parse(d.product.upsell_ids || '[]');
+      const pid = d.product._id || d.product.id;
+      api.get(`/reviews/${pid}`).then(setReviews).catch(() => {});
+
+      // upsell_ids: có thể là array hoặc JSON string
+      let ids = [];
+      try {
+        const raw = d.product.upsell_ids;
+        if (Array.isArray(raw)) ids = raw.filter(Boolean);
+        else if (typeof raw === 'string') ids = JSON.parse(raw).filter(Boolean);
+      } catch { ids = []; }
+
       if (ids.length) {
         Promise.all(ids.map(id => api.get(`/products/id/${id}`).catch(() => null)))
           .then(list => setUpsells(list.filter(Boolean)));
       }
     }).catch(() => navigate('/products'));
+
     if (user) api.get('/orders/my').then(o => setMyOrders(o)).catch(() => {});
     window.scrollTo(0, 0);
   }, [slug]);
 
   if (!data) return <div className="spinner" />;
   const { product, related } = data;
-  const specs = JSON.parse(product.specs || '{}');
+
+  // specs: MongoDB trả Map object hoặc plain object, SQLite trả JSON string
+  let specs = {};
+  try {
+    if (product.specs && typeof product.specs === 'string') {
+      specs = JSON.parse(product.specs);
+    } else if (product.specs && typeof product.specs === 'object') {
+      // MongoDB Map hoặc plain object
+      specs = product.specs instanceof Map
+        ? Object.fromEntries(product.specs)
+        : product.specs;
+    }
+  } catch { specs = {}; }
   const hasSpecs = Object.keys(specs).length > 0;
   const isAdmin = user?.role === 'admin';
 
@@ -719,11 +711,12 @@ function ProductDetailPage() {
 
   const submitReview = async () => {
     if (!reviewForm.order_id) return toast('Chọn đơn hàng của bạn', 'error');
+    const pid = product._id || product.id;
     try {
-      await api.post('/reviews', { product_id: product.id, ...reviewForm });
+      await api.post('/reviews', { product_id: pid, ...reviewForm });
       toast('Cảm ơn đánh giá của bạn!', 'success');
       setShowReviewForm(false);
-      api.get(`/reviews/${product.id}`).then(setReviews);
+      api.get(`/reviews/${pid}`).then(setReviews);
     } catch (err) {
       toast(err.error || 'Không thể gửi đánh giá', 'error');
     }
@@ -1292,7 +1285,7 @@ const STATUS_MAP = {
 };
 
 function OrderDetailPage() {
-  const id = window.location.pathname.split('/').pop();
+  const { id } = useParams();
   const [data, setData] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const { user } = useAuth();
@@ -1953,18 +1946,18 @@ function AdminProductsPage() {
 
 // ─── ADMIN: PRODUCT FORM ──────────────────────────────────────────────────────
 
-
 function AdminProductFormPage() {
-  const isEdit = window.location.pathname.includes('/edit/');
-  const id = isEdit ? window.location.pathname.split('/').pop() : null;
+  const { id } = useParams();
+  const isEdit = !!id;
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [specsRaw, setSpecsRaw] = useState('');
+  // specs dạng array [{key, value}] thay vì JSON string
+  const [specRows, setSpecRows] = useState([{ key: '', value: '' }]);
   const [upsellRaw, setUpsellRaw] = useState('');
   const [form, setForm] = useState({
-    name:'', slug:'', brand:'', price:'', stock:'', min_stock:'5', weight_kg:'1',
-    description:'', image_url:'', category_id:'', is_active:1
+    name: '', slug: '', brand: '', price: '', stock: '', min_stock: '5',
+    weight_kg: '1', description: '', image_url: '', category_id: '', is_active: 1
   });
   const toast = useToast();
   const navigate = useNavigate();
@@ -1974,16 +1967,34 @@ function AdminProductFormPage() {
     api.get('/categories').then(setCategories);
     if (isEdit) {
       api.get(`/admin/products/${id}`).then(p => {
+        const catId = p.category_id || p.category?._id || p.category || '';
         setForm({
-          name: p.name, slug: p.slug, brand: p.brand || '',
-          price: p.price, stock: p.stock, min_stock: p.min_stock || 5,
-          weight_kg: p.weight_kg || 1, description: p.description || '',
-          image_url: p.image_url || '', category_id: p.category_id || p.category || '',
-          is_active: p.is_active ? 1 : 0
+          name: p.name || '', slug: p.slug || '', brand: p.brand || '',
+          price: p.price || '', stock: p.stock ?? '', min_stock: p.min_stock ?? 5,
+          weight_kg: p.weight_kg || 1,
+          description: p.description || '', image_url: p.image_url || '',
+          category_id: catId.toString(),
+          is_active: (p.is_active === false || p.is_active === 0) ? 0 : 1
         });
-        const specs = p.specs instanceof Object && !Array.isArray(p.specs) ? p.specs : {};
-        setSpecsRaw(JSON.stringify(specs, null, 2));
-        setUpsellRaw((p.upsell_ids || []).join(', '));
+
+        // Parse specs sang array [{key, value}]
+        let specsObj = {};
+        try {
+          if (p.specs && typeof p.specs === 'string') specsObj = JSON.parse(p.specs);
+          else if (p.specs && typeof p.specs === 'object') specsObj = Object.fromEntries(
+            p.specs instanceof Map ? p.specs : Object.entries(p.specs)
+          );
+        } catch { specsObj = {}; }
+        const rows = Object.entries(specsObj).map(([key, value]) => ({ key, value: String(value) }));
+        setSpecRows(rows.length ? rows : [{ key: '', value: '' }]);
+
+        // upsell_ids
+        let upsellArr = [];
+        try {
+          const raw = p.upsell_ids;
+          upsellArr = Array.isArray(raw) ? raw.filter(Boolean) : JSON.parse(raw || '[]').filter(Boolean);
+        } catch { upsellArr = []; }
+        setUpsellRaw(upsellArr.join(', '));
       }).catch(() => navigate('/admin/products'));
     }
   }, [id]);
@@ -1996,57 +2007,64 @@ function AdminProductFormPage() {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Upload ảnh lên Cloudinary qua backend
+  // Spec rows helpers
+  const setSpecRow = (i, field, val) => setSpecRows(rows =>
+    rows.map((r, idx) => idx === i ? { ...r, [field]: val } : r)
+  );
+  const addSpecRow = () => setSpecRows(r => [...r, { key: '', value: '' }]);
+  const removeSpecRow = i => setSpecRows(r => r.filter((_, idx) => idx !== i));
+
+  // Upload ảnh
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return toast('Ảnh không được quá 5MB', 'error');
-
+    if (file.size > 5 * 1024 * 1024) return toast('Ảnh không quá 5MB', 'error');
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('image', file);
+      const fd = new FormData();
+      fd.append('image', file);
       const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/admin/upload`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: formData
+        body: fd
       });
       const data = await res.json();
-      if (data.url) {
-        set('image_url', data.url);
-        toast('Tải ảnh lên thành công!', 'success');
-      } else {
-        throw new Error(data.error || 'Upload thất bại');
-      }
-    } catch (err) {
-      toast(err.message || 'Lỗi tải ảnh', 'error');
-    } finally {
-      setUploading(false);
-    }
+      if (data.url) { set('image_url', data.url); toast('Tải ảnh thành công!', 'success'); }
+      else throw new Error(data.error || 'Upload thất bại');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = ''; }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.price || !form.category_id) return toast('Thiếu thông tin bắt buộc!', 'error');
+    if (!form.name || !form.price || !form.category_id)
+      return toast('Vui lòng điền đủ: Tên, Giá, Danh mục', 'error');
 
-    let specs = {};
-    try { specs = specsRaw.trim() ? JSON.parse(specsRaw) : {}; }
-    catch { return toast('Thông số kỹ thuật không đúng định dạng JSON', 'error'); }
+    // Build specs object từ rows, bỏ dòng trống
+    const specsObj = {};
+    specRows.forEach(r => { if (r.key.trim()) specsObj[r.key.trim()] = r.value.trim(); });
 
+    // upsell_ids: lọc bỏ rỗng
     const upsell_ids = upsellRaw.split(',').map(s => s.trim()).filter(Boolean);
 
     setLoading(true);
     try {
       const payload = {
-        ...form,
+        name: form.name.trim(),
+        slug: form.slug.trim(),
+        brand: form.brand.trim() || undefined,
         price: parseFloat(form.price),
         stock: parseInt(form.stock) || 0,
         min_stock: parseInt(form.min_stock) || 5,
         weight_kg: parseFloat(form.weight_kg) || 1,
+        description: form.description.trim() || undefined,
+        image_url: form.image_url.trim() || undefined,
+        category_id: form.category_id,
         is_active: form.is_active === 1 || form.is_active === true,
-        specs,
-        upsell_ids,
-        category_id: form.category_id
+        // Gửi specs là plain object — backend MongoDB sẽ nhận trực tiếp,
+        // backend SQLite sẽ nhận qua JSON.stringify
+        specs: specsObj,
+        upsell_ids: upsell_ids
       };
 
       if (isEdit) await api.patch(`/admin/products/${id}`, payload);
@@ -2055,10 +2073,8 @@ function AdminProductFormPage() {
       toast(isEdit ? 'Cập nhật thành công!' : 'Thêm sản phẩm thành công!', 'success');
       navigate('/admin/products');
     } catch (err) {
-      toast(err.error || 'Lỗi khi lưu', 'error');
-    } finally {
-      setLoading(false);
-    }
+      toast(err.error || err.message || 'Lỗi khi lưu', 'error');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -2070,26 +2086,28 @@ function AdminProductFormPage() {
       </div>
 
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: 'var(--shadow)' }}>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Hàng 1: Tên */}
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Tên sản phẩm *</label>
+            <input value={form.name} onChange={e => { set('name', e.target.value); if (!isEdit) set('slug', autoSlug(e.target.value)); }}
+              placeholder="Ấm đun siêu tốc Philips 1.7L" style={styles.input} />
+          </div>
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-
-            {/* Tên */}
-            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Tên sản phẩm *</label>
-              <input value={form.name} onChange={e => { set('name', e.target.value); if (!isEdit) set('slug', autoSlug(e.target.value)); }}
-                placeholder="Ấm đun siêu tốc Philips 1.7L" style={styles.input} />
-            </div>
-
             {/* Slug */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Slug (URL) *</label>
-              <input value={form.slug} onChange={e => set('slug', e.target.value)} placeholder="am-dun-sieu-toc-philips" style={styles.input} />
+              <input value={form.slug} onChange={e => set('slug', e.target.value)}
+                placeholder="am-dun-sieu-toc-philips" style={styles.input} />
             </div>
 
             {/* Thương hiệu */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Thương hiệu</label>
-              <input value={form.brand} onChange={e => set('brand', e.target.value)} placeholder="Philips, Sunhouse..." style={styles.input} />
+              <input value={form.brand} onChange={e => set('brand', e.target.value)}
+                placeholder="Philips, Sunhouse, Sharp..." style={styles.input} />
             </div>
 
             {/* Danh mục */}
@@ -2097,92 +2115,123 @@ function AdminProductFormPage() {
               <label style={styles.label}>Danh mục *</label>
               <select value={form.category_id} onChange={e => set('category_id', e.target.value)} style={styles.input}>
                 <option value="">-- Chọn danh mục --</option>
-                {categories.map(c => <option key={c._id || c.id} value={c._id || c.id}>{c.icon} {c.name}</option>)}
+                {categories.map(c => {
+                  const cid = (c._id || c.id || '').toString();
+                  return <option key={cid} value={cid}>{c.icon} {c.name}</option>;
+                })}
               </select>
             </div>
 
             {/* Giá */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Giá bán (₫) *</label>
-              <input value={form.price} onChange={e => set('price', e.target.value)} type="number" min="0" placeholder="250000" style={styles.input} />
+              <input value={form.price} onChange={e => set('price', e.target.value)}
+                type="number" min="0" placeholder="250000" style={styles.input} />
             </div>
 
             {/* Tồn kho */}
             <div style={styles.formGroup}>
-              <label style={styles.label}>Tồn kho</label>
-              <input value={form.stock} onChange={e => set('stock', e.target.value)} type="number" min="0" placeholder="100" style={styles.input} />
+              <label style={styles.label}>Số lượng tồn kho</label>
+              <input value={form.stock} onChange={e => set('stock', e.target.value)}
+                type="number" min="0" placeholder="100" style={styles.input} />
             </div>
 
             {/* Cảnh báo kho */}
             <div style={styles.formGroup}>
-              <label style={styles.label}>Cảnh báo khi còn dưới</label>
-              <input value={form.min_stock} onChange={e => set('min_stock', e.target.value)} type="number" min="0" placeholder="5" style={styles.input} />
+              <label style={styles.label}>Cảnh báo khi tồn kho dưới</label>
+              <input value={form.min_stock} onChange={e => set('min_stock', e.target.value)}
+                type="number" min="0" placeholder="5" style={styles.input} />
             </div>
 
             {/* Khối lượng */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Khối lượng (kg)</label>
-              <input value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)} type="number" min="0" step="0.1" placeholder="1.5" style={styles.input} />
-            </div>
-
-            {/* Upload ảnh */}
-            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Ảnh sản phẩm</label>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <div style={{ flex: 1 }}>
-                  <input value={form.image_url} onChange={e => set('image_url', e.target.value)}
-                    placeholder="Nhập URL hoặc upload ảnh bên dưới..." style={styles.input} />
-                  <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input ref={fileRef} type="file" accept="image/*" onChange={handleFileUpload}
-                      style={{ display: 'none' }} />
-                    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-                      style={{ ...styles.btn2, fontSize: 13, padding: '7px 14px' }}>
-                      {uploading ? '⏳ Đang tải...' : '📸 Chọn ảnh từ máy'}
-                    </button>
-                    <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Tối đa 5MB, định dạng JPG/PNG/WebP</span>
-                  </div>
-                </div>
-                {form.image_url && (
-                  <img src={form.image_url} alt="preview"
-                    style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', flexShrink: 0 }} />
-                )}
-              </div>
-            </div>
-
-            {/* Mô tả */}
-            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Mô tả sản phẩm</label>
-              <textarea value={form.description} onChange={e => set('description', e.target.value)}
-                placeholder="Mô tả chi tiết về sản phẩm..."
-                style={{ ...styles.input, height: 90, resize: 'vertical' }} />
-            </div>
-
-            {/* Thông số kỹ thuật JSON */}
-            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Thông số kỹ thuật (JSON)</label>
-              <textarea value={specsRaw} onChange={e => setSpecsRaw(e.target.value)}
-                placeholder={'{\n  "Công suất": "1200W",\n  "Dung tích": "1.7L",\n  "Chất liệu": "Inox 304"\n}'}
-                style={{ ...styles.input, height: 110, resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }} />
-              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                Nhập theo dạng JSON. Ví dụ: {`{"Công suất": "2200W", "Dung tích": "1.7L"}`}
-              </p>
-            </div>
-
-            {/* Upsell IDs */}
-            <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Gợi ý mua kèm — ID sản phẩm (cách nhau dấu phẩy)</label>
-              <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)}
-                placeholder="id1, id2, id3" style={styles.input} />
+              <input value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)}
+                type="number" min="0" step="0.1" placeholder="1.5" style={styles.input} />
             </div>
 
             {/* Trạng thái */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Trạng thái hiển thị</label>
               <select value={form.is_active} onChange={e => set('is_active', parseInt(e.target.value))} style={styles.input}>
-                <option value={1}>Đang bán (hiển thị)</option>
-                <option value={0}>Ẩn (không hiển thị)</option>
+                <option value={1}>Đang bán</option>
+                <option value={0}>Ẩn</option>
               </select>
             </div>
+          </div>
+
+          {/* Upload ảnh */}
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Ảnh sản phẩm</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <input value={form.image_url} onChange={e => set('image_url', e.target.value)}
+                  placeholder="Nhập URL ảnh hoặc upload từ máy bên dưới..." style={styles.input} />
+                <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input ref={fileRef} type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
+                  <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+                    style={{ ...styles.btn2, fontSize: 13, padding: '7px 14px' }}>
+                    {uploading ? '⏳ Đang tải...' : '📸 Chọn ảnh từ máy'}
+                  </button>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tối đa 5MB · JPG/PNG/WebP</span>
+                </div>
+              </div>
+              {form.image_url && (
+                <img src={form.image_url} alt="preview"
+                  style={{ width: 90, height: 70, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border)', flexShrink: 0 }} />
+              )}
+            </div>
+          </div>
+
+          {/* Mô tả */}
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Mô tả sản phẩm</label>
+            <textarea value={form.description} onChange={e => set('description', e.target.value)}
+              placeholder="Mô tả chi tiết về sản phẩm..."
+              style={{ ...styles.input, height: 90, resize: 'vertical' }} />
+          </div>
+
+          {/* Thông số kỹ thuật — UI key/value thay vì JSON */}
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Thông số kỹ thuật</label>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+              Nhập tên thông số và giá trị. Ví dụ: Công suất → 2200W
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {specRows.map((row, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    value={row.key}
+                    onChange={e => setSpecRow(i, 'key', e.target.value)}
+                    placeholder="Tên thông số (VD: Công suất)"
+                    style={{ ...styles.input, flex: 1 }}
+                  />
+                  <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>→</span>
+                  <input
+                    value={row.value}
+                    onChange={e => setSpecRow(i, 'value', e.target.value)}
+                    placeholder="Giá trị (VD: 2200W)"
+                    style={{ ...styles.input, flex: 1 }}
+                  />
+                  <button type="button" onClick={() => removeSpecRow(i)}
+                    disabled={specRows.length === 1}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f44336', fontSize: 18, flexShrink: 0, opacity: specRows.length === 1 ? 0.3 : 1 }}>
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={addSpecRow}
+                style={{ ...styles.btn2, fontSize: 13, padding: '6px 12px', alignSelf: 'flex-start', color: 'var(--primary)', borderColor: 'var(--primary)' }}>
+                + Thêm thông số
+              </button>
+            </div>
+          </div>
+
+          {/* Gợi ý mua kèm */}
+          <div style={styles.formGroup}>
+            <label style={styles.label}>Gợi ý mua kèm (ID sản phẩm, cách nhau dấu phẩy)</label>
+            <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)}
+              placeholder="Ví dụ: 3, 7, 12 (để trống nếu không có)" style={styles.input} />
           </div>
 
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
@@ -2191,7 +2240,7 @@ function AdminProductFormPage() {
               Huỷ
             </button>
             <button type="submit" className="btn btn-primary" disabled={loading || uploading}
-              style={{ flex: 2, justifyContent: 'center', padding: 14 }}>
+              style={{ flex: 2, justifyContent: 'center', padding: 14, fontSize: 15 }}>
               {loading ? 'Đang lưu...' : isEdit ? '💾 Lưu thay đổi' : '➕ Thêm sản phẩm'}
             </button>
           </div>
@@ -2457,34 +2506,59 @@ function AdminCouponsPage() {
 
 function AdminWarrantyFormPage() {
   const orderId = new URLSearchParams(window.location.search).get('order_id') || '';
-  const [form, setForm] = useState({ order_id: orderId, product_id:'', customer_phone:'', serial_number:'', imei:'', purchase_date: new Date().toISOString().slice(0,10), warranty_months:'12', notes:'' });
-  const [products, setProducts] = useState([]);
+  const [form, setForm] = useState({
+    order_id: orderId, product_id: '', customer_phone: '',
+    serial_number: '', imei: '',
+    purchase_date: new Date().toISOString().slice(0, 10),
+    warranty_months: '12', notes: ''
+  });
+  const [orderItems, setOrderItems] = useState([]);
+  const [orderInfo, setOrderInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const toast = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.get('/admin/products/all').then(setProducts);
-    if (orderId) {
-      api.get(`/orders/${orderId}`).then(d => {
-        setForm(f => ({ ...f, customer_phone: d.order.customer_phone }));
-        if (d.items?.length === 1) setForm(f => ({ ...f, product_id: d.items[0].product_id }));
-        setProducts(d.items?.map(i => ({ id: i.product_id, name: i.name })) || []);
-      }).catch(() => {});
-    }
+    if (!orderId) return;
+    api.get(`/orders/${orderId}`).then(d => {
+      const order = d.order;
+      const items = d.items || [];
+
+      // Tự điền SĐT khách từ đơn hàng
+      setForm(f => ({ ...f, customer_phone: order.customer_phone || '' }));
+
+      // Nếu đơn chỉ có 1 sản phẩm → tự chọn luôn
+      const firstId = items[0]?.product_id || items[0]?.product?.toString() || items[0]?.product || '';
+      if (items.length === 1 && firstId) {
+        setForm(f => ({ ...f, product_id: firstId }));
+      }
+
+      // Danh sách sản phẩm trong đơn để chọn
+      setOrderItems(items.map(i => ({
+        id: i.product_id || i.product?.toString() || i.product || '',
+        name: i.name || i.product_name || 'Sản phẩm'
+      })));
+
+      setOrderInfo(order);
+    }).catch(() => {
+      toast('Không tìm thấy đơn hàng', 'error');
+    });
   }, [orderId]);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.product_id) return toast('Vui lòng chọn sản phẩm', 'error');
+    if (!form.customer_phone) return toast('Vui lòng nhập SĐT khách', 'error');
     setLoading(true);
     try {
-      await api.post('/warranty/admin', form);
+      await api.post('/admin/warranty', form);
       toast('Tạo phiếu bảo hành thành công!', 'success');
       navigate('/admin/orders');
-    } catch (err) { toast(err.error || 'Lỗi tạo phiếu bảo hành', 'error'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      toast(err.error || 'Lỗi tạo phiếu bảo hành', 'error');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -2493,6 +2567,14 @@ function AdminWarrantyFormPage() {
         <button onClick={() => navigate('/admin/orders')} style={{ background: 'none', border: 'none', fontSize: 20, color: 'var(--text-muted)', cursor: 'pointer' }}>←</button>
         <h1 style={{ fontSize: 22, fontWeight: 700 }}>🛡️ Cấp phiếu bảo hành</h1>
       </div>
+
+      {/* Thông tin đơn hàng */}
+      {orderInfo && (
+        <div style={{ background: '#e3f2fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14 }}>
+          <strong>Đơn #{orderInfo.id || orderId}</strong> — {orderInfo.customer_name} — {orderInfo.shipping_address}
+        </div>
+      )}
+
       <div style={{ background: '#fff', borderRadius: 12, padding: 28, boxShadow: 'var(--shadow)' }}>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -2505,11 +2587,14 @@ function AdminWarrantyFormPage() {
               <input value={form.customer_phone} onChange={e => set('customer_phone', e.target.value)} placeholder="0918 058 495" style={styles.input} />
             </div>
             <div style={{ ...styles.formGroup, gridColumn: '1/-1' }}>
-              <label style={styles.label}>Sản phẩm *</label>
+              <label style={styles.label}>Sản phẩm bảo hành *</label>
               <select value={form.product_id} onChange={e => set('product_id', e.target.value)} style={styles.input}>
-                <option value="">-- Chọn sản phẩm --</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                <option value="">-- Chọn sản phẩm trong đơn --</option>
+                {orderItems.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+              {orderItems.length === 0 && orderId && (
+                <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Đang tải sản phẩm từ đơn hàng...</p>
+              )}
             </div>
             <div style={styles.formGroup}>
               <label style={styles.label}>Số serial (nếu có)</label>
@@ -2547,7 +2632,7 @@ function AdminWarrantyFormPage() {
   );
 }
 
-// // ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
+// ─── REQUIRE GUARDS ───────────────────────────────────────────────────────────
 
 function RequireLogin({ children }) {
   const { user } = useAuth();
