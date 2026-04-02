@@ -194,4 +194,49 @@ router.get('/warranty', async (req, res) => {
   res.json(list);
 });
 
+// ─── Coupons (đặt trong admin router để đảm bảo hoạt động) ───────────────────
+
+router.get('/coupons', async (req, res) => {
+  try {
+    const coupons = await Coupon.find().sort('-createdAt').lean();
+    res.json(coupons.map(c => ({ ...c, id: c._id })));
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/coupons', async (req, res) => {
+  try {
+    const { code, type, value, min_order = 0, max_uses = 100, expires_at } = req.body;
+    if (!code || !type) return res.status(400).json({ error: 'Thiếu mã hoặc loại' });
+    if (type !== 'free_ship' && (!value || parseFloat(value) <= 0))
+      return res.status(400).json({ error: 'Vui lòng nhập giá trị giảm giá' });
+
+    const coupon = await Coupon.create({
+      code: code.toUpperCase().trim(),
+      type,
+      value: type === 'free_ship' ? 0 : parseFloat(value),
+      min_order: parseFloat(min_order) || 0,
+      max_uses: parseInt(max_uses) || 100,
+      expires_at: expires_at || undefined,
+    });
+    res.status(201).json({ message: 'Tạo mã thành công', id: coupon._id });
+  } catch (err) {
+    if (err.code === 11000) return res.status(409).json({ error: 'Mã đã tồn tại' });
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/coupons/:id', async (req, res) => {
+  try {
+    await Coupon.findByIdAndUpdate(req.params.id, { is_active: req.body.is_active });
+    res.json({ message: 'Cập nhật thành công' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.delete('/coupons/:id', async (req, res) => {
+  try {
+    await Coupon.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Đã xoá' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

@@ -2474,7 +2474,7 @@ function AdminCouponsPage() {
   const [form, setForm] = useState({ code:'', type:'percent', value:'', min_order:'', max_uses:'100', expires_at:'' });
   const toast = useToast();
 
-  const fetchCoupons = () => { setLoading(true); api.get('/coupons/admin').then(setCoupons).finally(() => setLoading(false)); };
+  const fetchCoupons = () => { setLoading(true); api.get('/admin/coupons').then(setCoupons).finally(() => setLoading(false)); };
   useEffect(() => { fetchCoupons(); }, []);
 
   const createCoupon = async (e) => {
@@ -2493,7 +2493,7 @@ function AdminCouponsPage() {
         max_uses: parseInt(form.max_uses) || 100,
         expires_at: form.expires_at || null,
       };
-      await api.post('/coupons/admin', payload);
+      await api.post('/admin/coupons', payload);
       toast('Tạo mã thành công!', 'success');
       setShowForm(false);
       setForm({ code:'', type:'percent', value:'', min_order:'', max_uses:'100', expires_at:'' });
@@ -2502,13 +2502,13 @@ function AdminCouponsPage() {
   };
 
   const toggleCoupon = async (c) => {
-    await api.patch(`/coupons/admin/${c.id}`, { is_active: c.is_active ? 0 : 1 });
+    await api.patch(`/admin/coupons/${c.id}`, { is_active: c.is_active ? 0 : 1 });
     fetchCoupons();
   };
 
   const deleteCoupon = async (id) => {
     if (!window.confirm('Xoá mã này?')) return;
-    await api.delete(`/coupons/admin/${id}`);
+    await api.delete(`/admin/coupons/${id}`);
     toast('Đã xoá', 'success'); fetchCoupons();
   };
 
