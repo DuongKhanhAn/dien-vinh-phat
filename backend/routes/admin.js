@@ -194,22 +194,4 @@ router.get('/warranty', async (req, res) => {
   res.json(list);
 });
 
-// ─── Coupons (Admin) ─────────────────────────────────────────────────────────
-router.post('/coupons', async (req, res) => {
-  try {
-    const { code, type, value, min_order, max_uses, expires_at } = req.body;
-    const coupon = await Coupon.create({
-      code: code.toUpperCase().trim(),
-      type,
-      value: type === 'free_ship' ? 0 : parseFloat(value),
-      min_order: parseFloat(min_order) || 0,
-      max_uses: parseInt(max_uses) || 100,
-      expires_at: expires_at || undefined,
-    });
-    res.status(201).json({ message: 'Tạo mã thành công', id: coupon._id });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 module.exports = router;

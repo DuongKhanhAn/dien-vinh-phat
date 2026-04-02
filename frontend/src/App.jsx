@@ -337,6 +337,17 @@ function Footer() {
 
 // ─── STAR RATING ──────────────────────────────────────────────────────────────
 
+// Helper dùng chung: parse specs từ bất kỳ định dạng nào (string, Map, object)
+function parseSpecs(specs) {
+  if (!specs) return {};
+  if (typeof specs === 'string') {
+    try { return JSON.parse(specs); } catch { return {}; }
+  }
+  if (specs instanceof Map) return Object.fromEntries(specs);
+  if (typeof specs === 'object') return specs;
+  return {};
+}
+
 function StarRating({ value = 0, onChange, size = 20 }) {
   const [hover, setHover] = useState(0);
   return (
@@ -791,18 +802,8 @@ function ProductDetailPage() {
   if (!data) return <div className="spinner" />;
   const { product, related } = data;
 
-  // specs: MongoDB trả Map object hoặc plain object, SQLite trả JSON string
-  let specs = {};
-  try {
-    if (product.specs && typeof product.specs === 'string') {
-      specs = JSON.parse(product.specs);
-    } else if (product.specs && typeof product.specs === 'object') {
-      // MongoDB Map hoặc plain object
-      specs = product.specs instanceof Map
-        ? Object.fromEntries(product.specs)
-        : product.specs;
-    }
-  } catch { specs = {}; }
+  // specs: parse an toàn từ mọi định dạng (MongoDB Map/object, SQLite string)
+  const specs = parseSpecs(product.specs);
   const hasSpecs = Object.keys(specs).length > 0;
   const isAdmin = user?.role === 'admin';
 
@@ -1039,7 +1040,7 @@ function ComparePage() {
 
   // Tập hợp tất cả key specs
   const allSpecs = [...new Set(
-    products.flatMap(p => Object.keys(JSON.parse(p.specs || '{}')))
+    products.flatMap(p => Object.keys(parseSpecs(p.specs)))
   )];
 
   const cols = products.length;
@@ -1089,7 +1090,7 @@ function ComparePage() {
               </tr>
             )}
             {allSpecs.map(spec => {
-              const vals = products.map(p => JSON.parse(p.specs || '{}')[spec] || '—');
+              const vals = products.map(p => parseSpecs(p.specs)[spec] || '—');
               return (
                 <tr key={spec} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={styles.cmpLabel}>{spec}</td>
