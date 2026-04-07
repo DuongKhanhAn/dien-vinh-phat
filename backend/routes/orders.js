@@ -4,6 +4,7 @@ const router = express.Router();
 const { Order, Product, Coupon, Warranty } = require('../models');
 const { authMiddleware } = require('../middleware/auth');
 
+// POST /api/orders — Tạo đơn hàng
 router.post('/', authMiddleware, async (req, res) => {
   try {
     const { customer_name, customer_phone, shipping_address, payment_method = 'cod',
@@ -14,7 +15,6 @@ router.post('/', authMiddleware, async (req, res) => {
 
     let total_amount = 0;
     const orderItems = [];
-
     for (const item of items) {
       const product = await Product.findById(item.product_id);
       if (!product || !product.is_active) return res.status(400).json({ error: `Sản phẩm không tồn tại` });
@@ -26,7 +26,7 @@ router.post('/', authMiddleware, async (req, res) => {
     let discount_amount = 0;
     let validCoupon = null;
     if (coupon_code) {
-      validCoupon = await Coupon.findOne({ code: coupon_code.toUpperCase(), is_active: true, used_count: { $lt: mongoose.model ? 999 : 999 } });
+      validCoupon = await Coupon.findOne({ code: coupon_code.toUpperCase(), is_active: true, $expr: { $lt: ['$used_count', '$max_uses'] } });
       if (validCoupon && (!validCoupon.expires_at || validCoupon.expires_at > new Date()) && total_amount >= validCoupon.min_order) {
         if (validCoupon.type === 'percent') discount_amount = Math.round(total_amount * validCoupon.value / 100);
         else if (validCoupon.type === 'fixed') discount_amount = Math.min(validCoupon.value, total_amount);
@@ -41,7 +41,6 @@ router.post('/', authMiddleware, async (req, res) => {
       install_date: install_date || null, install_slot: install_slot || null
     });
 
-    // Giảm tồn kho + tăng used_count
     await Promise.all([
       ...orderItems.map(i => Product.findByIdAndUpdate(i.product, { $inc: { stock: -i.quantity } })),
       ...(validCoupon && discount_amount > 0 ? [Coupon.findByIdAndUpdate(validCoupon._id, { $inc: { used_count: 1 } })] : [])
@@ -51,6 +50,7 @@ router.post('/', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/orders/my
 router.get('/my', authMiddleware, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.id }).sort('-createdAt').lean();
@@ -58,6 +58,7 @@ router.get('/my', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// GET /api/orders/:id
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id).lean();
@@ -80,6 +81,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
   } catch { res.status(404).json({ error: 'Không tìm thấy' }); }
 });
 
+// PATCH /api/orders/:id/cancel
 router.patch('/:id/cancel', authMiddleware, async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -94,7 +96,6 @@ router.patch('/:id/cancel', authMiddleware, async (req, res) => {
         ? [Coupon.findOneAndUpdate({ code: order.coupon_code }, { $inc: { used_count: -1 } })]
         : [])
     ]);
-
     order.status = 'cancelled';
     await order.save();
     res.json({ message: 'Đã huỷ đơn hàng' });

@@ -11,7 +11,7 @@ router.get('/', async (req, res) => {
       { $group: { _id: '$category', count: { $sum: 1 } } }
     ]);
     const countMap = Object.fromEntries(counts.map(c => [c._id.toString(), c.count]));
-    res.json(cats.map(c => ({ ...c, product_count: countMap[c._id.toString()] || 0 })));
+    res.json(cats.map(c => ({ ...c, id: c._id, product_count: countMap[c._id.toString()] || 0 })));
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
