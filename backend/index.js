@@ -25,6 +25,7 @@ app.use('/api/coupons',  require('./routes/coupons'));
 app.use('/api/warranty', require('./routes/warranty'));
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', time: new Date() }));
+app.get('/api/version', (_, res) => res.json({ v: 2, coupons: true }));
 app.use((req, res) => res.status(404).json({ error: 'API không tồn tại' }));
 app.use((err, req, res, next) => { console.error(err); res.status(500).json({ error: 'Lỗi server' }); });
 
