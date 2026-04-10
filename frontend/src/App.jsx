@@ -1203,8 +1203,8 @@ function CheckoutPage() {
   const [wantInstall, setWantInstall] = useState(false);
   const [form, setForm] = useState({
     customer_name: user?.name || '',
-    customer_phone: '',
-    shipping_address: '',
+    customer_phone: user?.phone || '',
+    shipping_address: user?.address || '',
     payment_method: 'cod',
     install_date: '',
     install_slot: '',
@@ -1826,7 +1826,15 @@ function AuthPage() {
     e.preventDefault(); setLoading(true);
     try {
       const res = await api.post(isLogin ? '/auth/login' : '/auth/register', form);
-      login(res.token, res.user);
+      // Lưu token trước để interceptor có thể dùng
+      localStorage.setItem('token', res.token);
+      // Fetch full profile (có phone, address) thay vì chỉ dùng data từ login response
+      let fullUser = res.user;
+      try {
+        const profile = await api.get('/auth/me');
+        fullUser = { ...res.user, phone: profile.phone || '', address: profile.address || '' };
+      } catch {}
+      login(res.token, fullUser);
       toast(`Xin chào, ${res.user.name}!`, 'success');
       navigate(res.user.role === 'admin' ? '/admin/orders' : '/');
     } catch (err) { toast(err.error || 'Có lỗi xảy ra', 'error'); }
