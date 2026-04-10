@@ -283,9 +283,14 @@ function Header() {
                       </Link>
                     </>
                   ) : (
-                    <Link to="/orders/my" style={styles.dropdownItem} onClick={() => setMenuOpen(false)}>
-                      📦 Đơn hàng của tôi
-                    </Link>
+                    <>
+                      <Link to="/profile" style={styles.dropdownItem} onClick={() => setMenuOpen(false)}>
+                        👤 Tài khoản của tôi
+                      </Link>
+                      <Link to="/orders/my" style={styles.dropdownItem} onClick={() => setMenuOpen(false)}>
+                        📦 Đơn hàng của tôi
+                      </Link>
+                    </>
                   )}
                   <button onClick={() => { logout(); setMenuOpen(false); navigate('/'); }} style={styles.dropdownItem}>
                     🚪 Đăng xuất
@@ -1860,6 +1865,135 @@ function AuthPage() {
   );
 }
 
+// ─── PROFILE PAGE ────────────────────────────────────────────────────────────
+
+function ProfilePage() {
+  const { user, login } = useAuth();
+  const toast = useToast();
+  const [tab, setTab] = useState('info'); // 'info' | 'password'
+  const [loading, setLoading] = useState(false);
+  const [info, setInfo] = useState({ name: user?.name || '', phone: user?.phone || '', address: user?.address || '' });
+  const [pwd, setPwd] = useState({ current_password: '', new_password: '', confirm_password: '' });
+
+  const setI = (k, v) => setInfo(f => ({ ...f, [k]: v }));
+  const setP = (k, v) => setPwd(f => ({ ...f, [k]: v }));
+
+  const saveInfo = async (e) => {
+    e.preventDefault();
+    if (!info.name.trim()) return toast('Vui lòng nhập họ tên', 'error');
+    setLoading(true);
+    try {
+      const res = await api.patch('/auth/profile', info);
+      // Cập nhật lại user trong localStorage + context
+      const updatedUser = { ...user, name: res.name, phone: res.phone, address: res.address };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      login(localStorage.getItem('token'), updatedUser);
+      toast('Cập nhật thông tin thành công!', 'success');
+    } catch (err) { toast(err.error || 'Lỗi cập nhật', 'error'); }
+    finally { setLoading(false); }
+  };
+
+  const savePassword = async (e) => {
+    e.preventDefault();
+    if (!pwd.current_password) return toast('Nhập mật khẩu hiện tại', 'error');
+    if (pwd.new_password.length < 6) return toast('Mật khẩu mới tối thiểu 6 ký tự', 'error');
+    if (pwd.new_password !== pwd.confirm_password) return toast('Mật khẩu xác nhận không khớp', 'error');
+    setLoading(true);
+    try {
+      await api.patch('/auth/password', { current_password: pwd.current_password, new_password: pwd.new_password });
+      toast('Đổi mật khẩu thành công!', 'success');
+      setPwd({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (err) { toast(err.error || 'Mật khẩu hiện tại không đúng', 'error'); }
+    finally { setLoading(false); }
+  };
+
+  const tabStyle = (t) => ({
+    padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer', border: 'none',
+    borderBottom: `2px solid ${tab === t ? 'var(--primary)' : 'transparent'}`,
+    color: tab === t ? 'var(--primary)' : 'var(--text-muted)',
+    background: 'none', transition: 'all 0.15s'
+  });
+
+  return (
+    <div className="container" style={{ padding: '32px 16px 64px', maxWidth: 560 }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>👤 Tài khoản của tôi</h1>
+      <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>{user?.email}</p>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: 28 }}>
+        <button style={tabStyle('info')} onClick={() => setTab('info')}>Thông tin cá nhân</button>
+        <button style={tabStyle('password')} onClick={() => setTab('password')}>Đổi mật khẩu</button>
+      </div>
+
+      <div style={{ background: '#fff', borderRadius: 14, padding: 28, boxShadow: 'var(--shadow)' }}>
+
+        {/* Tab: Thông tin */}
+        {tab === 'info' && (
+          <form onSubmit={saveInfo} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Họ và tên *</label>
+              <input value={info.name} onChange={e => setI('name', e.target.value)}
+                placeholder="Nguyễn Văn A" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Email</label>
+              <input value={user?.email || ''} disabled
+                style={{ ...styles.input, background: 'var(--bg)', color: 'var(--text-muted)', cursor: 'not-allowed' }} />
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>Email không thể thay đổi</p>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Số điện thoại</label>
+              <input value={info.phone} onChange={e => setI('phone', e.target.value)}
+                type="tel" placeholder="0909 123 456" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Địa chỉ giao hàng mặc định</label>
+              <textarea value={info.address} onChange={e => setI('address', e.target.value)}
+                placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành..."
+                style={{ ...styles.input, height: 80, resize: 'vertical' }} />
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={loading}
+              style={{ justifyContent: 'center', padding: '12px', fontSize: 15 }}>
+              {loading ? 'Đang lưu...' : '💾 Lưu thông tin'}
+            </button>
+          </form>
+        )}
+
+        {/* Tab: Đổi mật khẩu */}
+        {tab === 'password' && (
+          <form onSubmit={savePassword} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Mật khẩu hiện tại *</label>
+              <input value={pwd.current_password} onChange={e => setP('current_password', e.target.value)}
+                type="password" placeholder="Nhập mật khẩu hiện tại" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Mật khẩu mới *</label>
+              <input value={pwd.new_password} onChange={e => setP('new_password', e.target.value)}
+                type="password" placeholder="Tối thiểu 6 ký tự" style={styles.input} />
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Xác nhận mật khẩu mới *</label>
+              <input value={pwd.confirm_password} onChange={e => setP('confirm_password', e.target.value)}
+                type="password" placeholder="Nhập lại mật khẩu mới" style={styles.input} />
+              {pwd.confirm_password && pwd.new_password !== pwd.confirm_password && (
+                <p style={{ fontSize: 12, color: '#f44336', marginTop: 4 }}>Mật khẩu không khớp</p>
+              )}
+              {pwd.confirm_password && pwd.new_password === pwd.confirm_password && pwd.confirm_password.length >= 6 && (
+                <p style={{ fontSize: 12, color: 'var(--success)', marginTop: 4 }}>✓ Mật khẩu khớp</p>
+              )}
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={loading}
+              style={{ justifyContent: 'center', padding: '12px', fontSize: 15 }}>
+              {loading ? 'Đang cập nhật...' : '🔐 Đổi mật khẩu'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── ADMIN: ORDERS ────────────────────────────────────────────────────────────
 
 function AdminOrdersPage() {
@@ -2788,6 +2922,7 @@ export default function App() {
               <Route path="/login" element={<AuthPage />} />
 
               {/* Customer only */}
+              <Route path="/profile" element={<RequireLogin><ProfilePage /></RequireLogin>} />
               <Route path="/cart" element={<RequireLogin><CartPage /></RequireLogin>} />
               <Route path="/checkout" element={<RequireLogin><CheckoutPage /></RequireLogin>} />
               <Route path="/orders/my" element={<RequireLogin><MyOrdersPage /></RequireLogin>} />

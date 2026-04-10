@@ -2,7 +2,6 @@
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 
-// ─── Category ─────────────────────────────────────────────────────────────────
 const categorySchema = new Schema({
   name: { type: String, required: true },
   slug: { type: String, required: true, unique: true },
@@ -10,7 +9,6 @@ const categorySchema = new Schema({
 });
 const Category = mongoose.model('Category', categorySchema);
 
-// ─── Product ──────────────────────────────────────────────────────────────────
 const productSchema = new Schema({
   category:    { type: Schema.Types.ObjectId, ref: 'Category' },
   name:        { type: String, required: true },
@@ -28,18 +26,16 @@ const productSchema = new Schema({
 }, { timestamps: true });
 const Product = mongoose.model('Product', productSchema);
 
-// ─── User ─────────────────────────────────────────────────────────────────────
 const userSchema = new Schema({
   name:          { type: String, required: true },
   email:         { type: String, required: true, unique: true, lowercase: true },
   password_hash: { type: String, required: true },
-  phone:         String,
-  address:       String,
+  phone:         { type: String, default: '' },
+  address:       { type: String, default: '' },
   role:          { type: String, enum: ['customer', 'admin'], default: 'customer' }
 }, { timestamps: true });
 const User = mongoose.model('User', userSchema);
 
-// ─── Order ────────────────────────────────────────────────────────────────────
 const orderItemSchema = new Schema({
   product:    { type: Schema.Types.ObjectId, ref: 'Product', required: true },
   name:       String,
@@ -66,7 +62,6 @@ const orderSchema = new Schema({
 }, { timestamps: true });
 const Order = mongoose.model('Order', orderSchema);
 
-// ─── Coupon ───────────────────────────────────────────────────────────────────
 const couponSchema = new Schema({
   code:       { type: String, required: true, unique: true, uppercase: true },
   type:       { type: String, enum: ['percent', 'fixed', 'free_ship'], required: true },
@@ -79,7 +74,6 @@ const couponSchema = new Schema({
 }, { timestamps: true });
 const Coupon = mongoose.model('Coupon', couponSchema);
 
-// ─── Review ───────────────────────────────────────────────────────────────────
 const reviewSchema = new Schema({
   product:   { type: Schema.Types.ObjectId, ref: 'Product', required: true },
   user:      { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -91,7 +85,6 @@ const reviewSchema = new Schema({
 reviewSchema.index({ product: 1, user: 1, order: 1 }, { unique: true });
 const Review = mongoose.model('Review', reviewSchema);
 
-// ─── Warranty ─────────────────────────────────────────────────────────────────
 const warrantySchema = new Schema({
   order:          { type: Schema.Types.ObjectId, ref: 'Order', required: true },
   product:        { type: Schema.Types.ObjectId, ref: 'Product', required: true },

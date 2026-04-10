@@ -37,4 +37,33 @@ router.get('/me', authMiddleware, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// PATCH /api/auth/profile
+router.patch('/profile', authMiddleware, async (req, res) => {
+  try {
+    const { name, phone, address } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: 'Họ tên không được để trống' });
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { name: name.trim(), phone: phone?.trim() || '', address: address?.trim() || '' },
+      { new: true }
+    ).select('-password_hash');
+    res.json({ id: user._id, name: user.name, email: user.email, phone: user.phone, address: user.address, role: user.role });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// PATCH /api/auth/password
+router.patch('/password', authMiddleware, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) return res.status(400).json({ error: 'Thiếu thông tin' });
+    if (new_password.length < 6) return res.status(400).json({ error: 'Mật khẩu mới tối thiểu 6 ký tự' });
+    const user = await User.findById(req.user.id);
+    if (!await bcrypt.compare(current_password, user.password_hash))
+      return res.status(401).json({ error: 'Mật khẩu hiện tại không đúng' });
+    user.password_hash = await bcrypt.hash(new_password, 10);
+    await user.save();
+    res.json({ message: 'Đổi mật khẩu thành công' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;
