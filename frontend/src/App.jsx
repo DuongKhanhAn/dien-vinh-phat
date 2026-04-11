@@ -2474,11 +2474,11 @@ function AdminProductFormPage() {
           </div>
 
           {/* Gợi ý mua kèm */}
-          <div style={styles.formGroup}>
+          {/* <div style={styles.formGroup}>
             <label style={styles.label}>Gợi ý mua kèm (ID sản phẩm, cách nhau dấu phẩy)</label>
             <input value={upsellRaw} onChange={e => setUpsellRaw(e.target.value)}
               placeholder="Ví dụ: 3, 7, 12 (để trống nếu không có)" style={styles.input} />
-          </div>
+          </div> */}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
             <button type="button" onClick={() => navigate('/admin/products')}
