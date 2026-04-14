@@ -560,7 +560,7 @@ function HomePage() {
 
         <div style={styles.trustRow}>
           {[
-            { icon: '🚚', t: 'Giao hàng toàn quốc', s: 'Nhanh chóng, an toàn' },
+            { icon: '🚚', t: 'Giao hàng trong khu vực', s: 'Nhanh chóng, an toàn' },
             { icon: '✅', t: 'Hàng chính hãng 100%', s: 'Bảo hành đầy đủ' },
             { icon: '🔄', t: 'Đổi trả 7 ngày', s: 'Nếu lỗi từ nhà sản xuất' },
             { icon: '📞', t: 'Hỗ trợ 24/7', s: SHOP.phone },
