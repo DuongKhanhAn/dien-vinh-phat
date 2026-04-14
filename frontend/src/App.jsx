@@ -2389,13 +2389,6 @@ function AdminProductFormPage() {
                 type="number" min="0" placeholder="5" style={styles.input} />
             </div>
 
-            {/* Khối lượng */}
-            <div style={styles.formGroup}>
-              <label style={styles.label}>Khối lượng (kg)</label>
-              <input value={form.weight_kg} onChange={e => set('weight_kg', e.target.value)}
-                type="number" min="0" step="0.1" placeholder="1.5" style={styles.input} />
-            </div>
-
             {/* Trạng thái */}
             <div style={styles.formGroup}>
               <label style={styles.label}>Trạng thái hiển thị</label>
